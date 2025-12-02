@@ -155,10 +155,3 @@ async function handleStatusCommand(chatId: number, userId: number) {
   })
 }
 
-// Disable body parser for webhook
-export const config = {
-  api: {
-    bodyParser: true,
-  },
-}
-
