@@ -1,0 +1,22 @@
+# Exclude filesystem-mcp from Vercel builds
+filesystem-mcp/
+
+# Test files
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+
+# Documentation
+*.md
+!README.md
+
+# Scripts
+scripts/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env*.local
+

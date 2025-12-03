@@ -280,12 +280,12 @@ async function handleStartCommand(chatId: number, firstName: string) {
     const keyboard = createMiniAppKeyboard(webAppUrl)
     console.log('[BOT] Keyboard created:', JSON.stringify(keyboard, null, 2))
     
-    // Отправляем сообщение с Markdown форматированием и клавиатурой
+    // Отправляем сообщение (без Markdown временно)
     const result = await sendMessage(
       chatId,
       welcomeText,
       {
-        parse_mode: 'Markdown',
+        // parse_mode: 'Markdown', // Временно отключаем Markdown
         reply_markup: {
           inline_keyboard: keyboard,
         },

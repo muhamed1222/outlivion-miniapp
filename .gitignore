@@ -45,3 +45,6 @@ next-env.d.ts
 *.swo
 *~
 
+# MCP Servers (не часть основного проекта)
+filesystem-mcp/
+
