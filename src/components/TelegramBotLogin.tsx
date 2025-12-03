@@ -187,12 +187,16 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
               <p className="text-white font-medium mb-2">
                 Ожидаем подтверждение в Telegram
               </p>
-              <p className="text-neutral-400 text-sm mb-4">
-                Откройте бота и нажмите Start для подтверждения входа
+              <p className="text-neutral-400 text-sm mb-1">
+                Откройте бота и нажмите <span className="font-semibold text-[#F55128]">Start</span>
               </p>
-              <p className="text-neutral-500 text-xs">
-                Попытка {pollCountRef.current} из {MAX_POLL_ATTEMPTS}
+              <p className="text-neutral-500 text-xs mb-4">
+                для подтверждения входа
               </p>
+              <div className="flex items-center justify-center gap-2 text-neutral-500 text-xs">
+                <div className="w-2 h-2 bg-[#F55128] rounded-full animate-pulse"></div>
+                <span>Проверка {pollCountRef.current}/{MAX_POLL_ATTEMPTS}</span>
+              </div>
             </div>
 
             <button
