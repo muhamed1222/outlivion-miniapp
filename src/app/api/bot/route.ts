@@ -26,8 +26,20 @@ export async function POST(request: NextRequest) {
 
     // Handle different update types
     if (update.message) {
-      await handleMessage(update)
+      console.log('[BOT] Received message:', {
+        chatId: update.message.chat.id,
+        text: update.message.text,
+        from: update.message.from.first_name
+      })
+      try {
+        await handleMessage(update)
+        console.log('[BOT] Message handled successfully')
+      } catch (error) {
+        console.error('[BOT] Error handling message:', error)
+        throw error
+      }
     } else if (update.callback_query) {
+      console.log('[BOT] Received callback:', update.callback_query.data)
       await handleCallbackQuery(update)
     }
 
@@ -92,16 +104,34 @@ async function handleCallbackQuery(update: TelegramUpdate) {
 async function handleStartCommand(chatId: number, firstName: string) {
   const miniAppUrl = process.env.NEXT_PUBLIC_MINIAPP_URL || 'http://localhost:3002'
   
-  await sendMessage(
-    chatId,
-    getWelcomeMessage(firstName),
-    {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: createMiniAppKeyboard(miniAppUrl),
-      },
+  console.log('[BOT] handleStartCommand:', { chatId, firstName, miniAppUrl })
+  
+  try {
+    const response = await sendMessage(
+      chatId,
+      getWelcomeMessage(firstName),
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: createMiniAppKeyboard(miniAppUrl),
+        },
+      }
+    )
+    
+    const result = await response.json()
+    console.log('[BOT] sendMessage result:', { 
+      ok: result.ok, 
+      status: response.status,
+      error: result.error_code || result.description 
+    })
+    
+    if (!response.ok || !result.ok) {
+      console.error('[BOT] Failed to send message:', result)
     }
-  )
+  } catch (error) {
+    console.error('[BOT] Error in handleStartCommand:', error)
+    throw error
+  }
 
   // TODO: Create user in database if doesn't exist
   // await createUserIfNotExists(chatId)
