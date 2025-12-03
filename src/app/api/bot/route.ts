@@ -18,16 +18,20 @@ export async function POST(request: NextRequest) {
     // Verify webhook secret
     const secret = request.headers.get('x-telegram-bot-api-secret-token')
     if (!verifyWebhookSecret(secret)) {
+      console.log('Webhook secret verification failed')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Parse update
     const update: TelegramUpdate = await request.json()
+    console.log('Received update:', JSON.stringify(update, null, 2))
 
     // Handle different update types
     if (update.message) {
+      console.log('Handling message:', update.message.text)
       await handleMessage(update)
     } else if (update.callback_query) {
+      console.log('Handling callback query:', update.callback_query.data)
       await handleCallbackQuery(update)
     }
 
@@ -92,16 +96,24 @@ async function handleCallbackQuery(update: TelegramUpdate) {
 async function handleStartCommand(chatId: number, firstName: string) {
   const miniAppUrl = process.env.NEXT_PUBLIC_MINIAPP_URL || 'http://localhost:3002'
   
-  await sendMessage(
-    chatId,
-    getWelcomeMessage(firstName),
-    {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: createMiniAppKeyboard(miniAppUrl),
-      },
-    }
-  )
+  console.log('handleStartCommand called:', { chatId, firstName, miniAppUrl })
+  
+  try {
+    const response = await sendMessage(
+      chatId,
+      getWelcomeMessage(firstName),
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: createMiniAppKeyboard(miniAppUrl),
+        },
+      }
+    )
+    
+    console.log('sendMessage response status:', response.status)
+  } catch (error) {
+    console.error('Error in handleStartCommand:', error)
+  }
 
   // TODO: Create user in database if doesn't exist
   // await createUserIfNotExists(chatId)

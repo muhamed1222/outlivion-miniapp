@@ -61,6 +61,7 @@ export async function sendMessage(
 ): Promise<Response> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   if (!botToken) {
+    console.error('TELEGRAM_BOT_TOKEN not configured')
     throw new Error('TELEGRAM_BOT_TOKEN not configured')
   }
 
@@ -72,13 +73,30 @@ export async function sendMessage(
     ...options,
   }
 
-  return fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
+  console.log('Sending message to chat:', chatId)
+  
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+    
+    const result = await response.json()
+    
+    if (!response.ok) {
+      console.error('Failed to send message:', result)
+    } else {
+      console.log('Message sent successfully:', result)
+    }
+    
+    return response
+  } catch (error) {
+    console.error('Error sending message:', error)
+    throw error
+  }
 }
 
 /**
