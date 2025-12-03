@@ -73,6 +73,7 @@ export async function sendMessage(
   }
 
   console.log('[BOT] Sending message to Telegram API:', { chatId, textLength: text.length })
+  console.log('[BOT] Request body:', JSON.stringify(body, null, 2))
   
   try {
     const response = await fetch(url, {
@@ -90,11 +91,12 @@ export async function sendMessage(
     console.log('[BOT] Telegram API response:', { 
       ok: result.ok, 
       status: response.status,
-      error: result.error_code || result.description 
+      error_code: result.error_code,
+      description: result.description
     })
     
     if (!response.ok || !result.ok) {
-      console.error('[BOT] Telegram API error:', result)
+      console.error('[BOT] Telegram API error details:', JSON.stringify(result, null, 2))
     }
     
     return response
