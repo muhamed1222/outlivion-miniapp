@@ -1,7 +1,7 @@
-'use client';
-
 import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from 'axios';
-import { getTelegramInitData, isTelegramWebApp, getMockTelegramData } from './telegram';
+import Cookies from 'js-cookie';
+import { tokenStorage } from './storage';
+import { isTelegramEnvironment } from './utils/environment';
 
 // API configuration
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -32,27 +32,26 @@ export class ApiError extends Error {
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
-  baseURL: `${API_URL}/miniapp`,
+  baseURL: API_URL,
   timeout: REQUEST_TIMEOUT,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor - add Telegram initData
+// Request interceptor - add auth token from unified storage
 api.interceptors.request.use(
-  (config) => {
-    let initData = '';
+  async (config) => {
+    // Get access token from unified storage (localStorage or cookies)
+    let token = tokenStorage.getAccessToken();
     
-    if (isTelegramWebApp()) {
-      initData = getTelegramInitData();
-    } else if (process.env.NODE_ENV === 'development') {
-      // В режиме разработки используем mock данные
-      initData = getMockTelegramData().initData;
-    }
+    // TODO Phase 3+: Add token refresh logic here
+    // if (token && isTokenExpired(token)) {
+    //   token = await refreshAccessToken();
+    // }
     
-    if (initData) {
-      config.headers['X-Telegram-Init-Data'] = initData;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     
     return config;
@@ -69,25 +68,28 @@ api.interceptors.response.use(
     // Handle network errors
     if (!error.response) {
       throw new ApiError(
-        'Ошибка сети. Проверьте подключение к интернету.',
+        'Network error. Please check your connection.',
         0,
         'NETWORK_ERROR'
       );
     }
 
     const { status, data } = error.response;
-    const errorMessage = data?.error || data?.message || 'Произошла ошибка';
+    const errorMessage = data?.error || data?.message || 'An error occurred';
     const errorCode = data?.code;
     const errorDetails = data?.details;
 
     // Handle 401 - Unauthorized
     if (status === 401) {
-      throw new ApiError('Ошибка авторизации. Перезапустите приложение.', 401, 'UNAUTHORIZED');
-    }
-
-    // Handle 403 - Forbidden
-    if (status === 403) {
-      throw new ApiError('Доступ запрещён.', 403, 'FORBIDDEN');
+      // Clear tokens from unified storage
+      tokenStorage.clearAll();
+      
+      // Redirect to login based on environment
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        const loginPath = isTelegramEnvironment() ? '/telegram/login' : '/web/login';
+        const currentPath = window.location.pathname;
+        window.location.href = `${loginPath}?redirect=${encodeURIComponent(currentPath)}`;
+      }
     }
 
     throw new ApiError(errorMessage, status, errorCode, errorDetails);
@@ -143,7 +145,6 @@ export interface User {
   balance?: number;
   createdAt?: string;
   isNewUser?: boolean;
-  referralId?: string;
 }
 
 export interface Subscription {
@@ -154,7 +155,6 @@ export interface Subscription {
   endDate?: string;
   daysRemaining?: number;
   isExpired?: boolean;
-  isActive?: boolean;
   message?: string;
 }
 
@@ -191,8 +191,10 @@ export interface ServerConfig {
 }
 
 export interface AuthResponse {
-  success: boolean;
-  token?: string;
+  token: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
   user: User;
 }
 
@@ -204,12 +206,10 @@ export interface CreatePaymentResponse {
 }
 
 export interface PromoCodeResponse {
-  success: boolean;
   code: string;
   discountType: 'percentage' | 'fixed';
   discountValue: number;
   valid: boolean;
-  message?: string;
 }
 
 // ====================
@@ -218,10 +218,72 @@ export interface PromoCodeResponse {
 
 export const authApi = {
   /**
-   * Verify Telegram authorization
+   * Login with Telegram
+   * Supports both Widget data and Mini App initData
    */
-  async verify(): Promise<AuthResponse> {
-    return apiClient.post<AuthResponse>('/auth/verify');
+  async loginWithTelegram(data: {
+    // Option 1: Mini App initData
+    initData?: string;
+    // Option 2: Widget data
+    id?: string;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+    photo_url?: string;
+    auth_date?: string;
+    hash?: string;
+    // Common
+    referralId?: string;
+  }): Promise<AuthResponse> {
+    const response = await apiClient.post<AuthResponse>('/auth/telegram', data);
+    
+    // Note: Token storage is handled by unified auth module
+    // This is kept for backwards compatibility
+    if (response.accessToken || response.token) {
+      Cookies.set('token', response.accessToken || response.token, { expires: 1 });
+    }
+    if (response.refreshToken) {
+      Cookies.set('refreshToken', response.refreshToken, { expires: 7 });
+    }
+    
+    return response;
+  },
+
+  /**
+   * Refresh access token
+   */
+  async refreshToken(): Promise<AuthResponse> {
+    const refreshToken = Cookies.get('refreshToken');
+    const telegramId = Cookies.get('telegramId');
+    
+    if (!refreshToken || !telegramId) {
+      throw new ApiError('No refresh token available', 401, 'NO_REFRESH_TOKEN');
+    }
+    
+    const response = await apiClient.post<AuthResponse>('/auth/refresh', {
+      refreshToken,
+      telegramId,
+    });
+    
+    Cookies.set('token', response.accessToken || response.token, { expires: 1 });
+    if (response.refreshToken) {
+      Cookies.set('refreshToken', response.refreshToken, { expires: 7 });
+    }
+    
+    return response;
+  },
+
+  /**
+   * Logout
+   */
+  logout(): void {
+    Cookies.remove('token');
+    Cookies.remove('refreshToken');
+    Cookies.remove('telegramId');
+    
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
   },
 };
 
@@ -278,7 +340,32 @@ export const serverApi = {
   },
 };
 
+export interface Tariff {
+  id: string;
+  name: string;
+  duration: number; // days
+  price: number;
+  pricePerMonth: number;
+  discount: number; // percentage
+  features: string[];
+  popular: boolean;
+}
+
+export interface TariffResponse {
+  tariffs: Tariff[];
+  currency: string;
+  defaultDevices: number;
+  maxDevices: number;
+}
+
 export const billingApi = {
+  /**
+   * Get available tariffs
+   */
+  async getTariffs(): Promise<TariffResponse> {
+    return apiClient.get<TariffResponse>('/billing/tariffs');
+  },
+  
   /**
    * Create payment
    */
@@ -289,19 +376,6 @@ export const billingApi = {
   }): Promise<CreatePaymentResponse> {
     return apiClient.post<CreatePaymentResponse>('/billing/create', params);
   },
-
-  /**
-   * Get tariff plans
-   */
-  async getTariffs(): Promise<Array<{
-    id: string;
-    name: string;
-    price: number;
-    duration: number;
-    description?: string;
-  }>> {
-    return apiClient.get('/billing/tariffs');
-  },
 };
 
 export const promoApi = {
@@ -311,15 +385,7 @@ export const promoApi = {
   async applyPromoCode(code: string): Promise<PromoCodeResponse> {
     return apiClient.post<PromoCodeResponse>('/promo/apply', { code });
   },
-
-  /**
-   * Validate promo code
-   */
-  async validatePromoCode(code: string): Promise<PromoCodeResponse> {
-    return apiClient.post<PromoCodeResponse>('/promo/validate', { code });
-  },
 };
 
 // Export default for backwards compatibility
 export default api;
-

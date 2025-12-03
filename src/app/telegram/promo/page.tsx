@@ -41,7 +41,7 @@ export default function PromoPage() {
     hapticImpact('light');
 
     try {
-      const result = await promoApi.validatePromoCode(promoCode.trim());
+      const result = await promoApi.applyPromoCode(promoCode.trim());
       setValidationResult(result);
 
       if (result.valid) {
@@ -49,7 +49,7 @@ export default function PromoPage() {
         showToast('Промокод действителен!', 'success');
       } else {
         hapticNotification('error');
-        showToast(result.message || 'Промокод недействителен', 'error');
+        showToast('Промокод недействителен', 'error');
       }
     } catch (error: any) {
       console.error('Failed to validate promo code:', error);
@@ -73,17 +73,17 @@ export default function PromoPage() {
     try {
       const result = await promoApi.applyPromoCode(promoCode.trim());
 
-      if (result.success) {
+      if (result.valid) {
         hapticNotification('success');
         showToast('Промокод применён!', 'success');
         
         // Перенаправляем на главную страницу через 1.5 секунды
         setTimeout(() => {
-          router.push('/');
+          router.push('/telegram');
         }, 1500);
       } else {
         hapticNotification('error');
-        showToast(result.message || 'Не удалось применить промокод', 'error');
+        showToast('Не удалось применить промокод', 'error');
       }
     } catch (error: any) {
       console.error('Failed to apply promo code:', error);
@@ -197,11 +197,6 @@ export default function PromoPage() {
                       {validationResult.valid && (
                         <p className="text-text-primary font-semibold">
                           {getDiscountText(validationResult)}
-                        </p>
-                      )}
-                      {validationResult.message && (
-                        <p className="text-text-secondary text-sm mt-1">
-                          {validationResult.message}
                         </p>
                       )}
                     </div>

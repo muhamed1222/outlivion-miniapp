@@ -14,7 +14,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    href: '/',
+    href: '/telegram',
     label: 'Главная',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -23,7 +23,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    href: '/subscription',
+    href: '/telegram/subscription',
     label: 'Подписка',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -32,7 +32,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    href: '/servers',
+    href: '/telegram/servers',
     label: 'Серверы',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -41,7 +41,7 @@ const navItems: NavItem[] = [
     ),
   },
   {
-    href: '/promo',
+    href: '/telegram/promo',
     label: 'Промокод',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,7 +64,7 @@ export function NavigationBar() {
         <div className="flex items-center justify-around">
           {navItems.map((item) => {
             const isActive = pathname === item.href || 
-              (item.href !== '/' && pathname.startsWith(item.href));
+              (item.href !== '/telegram' && pathname.startsWith(item.href));
 
             return (
               <Link

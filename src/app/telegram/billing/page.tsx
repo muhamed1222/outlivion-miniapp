@@ -80,14 +80,15 @@ export default function BillingPage() {
         setPayments(paymentsData);
 
         // Попытка загрузить тарифы с сервера
-        try {
-          const tariffsData = await billingApi.getTariffs();
-          if (tariffsData && tariffsData.length > 0) {
-            setTariffs(tariffsData as TariffPlan[]);
-          }
-        } catch (error) {
-          console.log('Using default tariffs');
-        }
+        // TODO Phase 3: Add billingApi.getTariffs() endpoint
+        // try {
+        //   const tariffsData = await billingApi.getTariffs();
+        //   if (tariffsData && tariffsData.length > 0) {
+        //     setTariffs(tariffsData as TariffPlan[]);
+        //   }
+        // } catch (error) {
+        //   console.log('Using default tariffs');
+        // }
       } catch (error: any) {
         console.error('Failed to fetch data:', error);
         showToast(error.message || 'Ошибка загрузки данных', 'error');
@@ -317,10 +318,10 @@ export default function BillingPage() {
                       key={payment.id}
                       className="p-4 bg-background-tertiary rounded-xl"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-text-primary">
-                          {formatPrice(payment.amount, payment.currency === 'RUB' ? '₽' : payment.currency)}
-                        </span>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold text-text-primary">
+                            {formatPrice(payment.amount)}
+                          </span>
                         <span className={cn('text-sm font-medium', getPaymentStatusColor(payment.status))}>
                           {getPaymentStatusText(payment.status)}
                         </span>
