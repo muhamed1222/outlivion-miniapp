@@ -182,19 +182,36 @@ export async function answerCallbackQuery(
 export function verifyWebhookSecret(secret: string | null): boolean {
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
   
-  // Если secret не настроен, разрешаем запросы (для разработки)
+  // Логируем для диагностики
+  console.log('[BOT] verifyWebhookSecret:', {
+    hasSecretInEnv: !!webhookSecret,
+    hasSecretInRequest: !!secret,
+    nodeEnv: process.env.NODE_ENV,
+  })
+  
+  // Если secret не настроен в переменных окружения, разрешаем все запросы
+  // Это означает, что webhook установлен БЕЗ secret_token
   if (!webhookSecret) {
     if (process.env.NODE_ENV === 'production') {
       console.warn('[BOT] ⚠️ TELEGRAM_WEBHOOK_SECRET not set in production! Webhook is insecure!')
-      // В production лучше отклонить, но для совместимости разрешаем
+      console.warn('[BOT] Разрешаем запросы без secret для совместимости')
       // TODO: Включить строгую проверку после настройки secret
-      return true
     }
-    // В development разрешаем без secret
+    // Разрешаем запросы без secret (webhook установлен без secret_token)
     return true
   }
   
-  // Проверяем secret
+  // Если secret настроен в env, но Telegram не отправляет его (webhook без secret_token)
+  // Разрешаем для совместимости, но предупреждаем
+  if (!secret) {
+    console.warn('[BOT] Webhook secret настроен в env, но запрос пришёл без secret token')
+    console.warn('[BOT] Webhook установлен БЕЗ secret_token - разрешаем для совместимости')
+    console.warn('[BOT] Для безопасности установите webhook с secret_token или удалите TELEGRAM_WEBHOOK_SECRET из env')
+    // Разрешаем для совместимости, но это небезопасно
+    return true
+  }
+  
+  // Проверяем совпадение secret
   const isValid = secret === webhookSecret
   
   if (!isValid) {
@@ -202,6 +219,8 @@ export function verifyWebhookSecret(secret: string | null): boolean {
       received: secret ? 'present' : 'missing',
       expected: webhookSecret ? 'configured' : 'not configured',
     })
+  } else {
+    console.log('[BOT] ✅ Webhook secret verified successfully')
   }
   
   return isValid
