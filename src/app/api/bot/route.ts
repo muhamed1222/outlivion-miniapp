@@ -18,35 +18,26 @@ export async function POST(request: NextRequest) {
     // Verify webhook secret
     const secret = request.headers.get('x-telegram-bot-api-secret-token')
     if (!verifyWebhookSecret(secret)) {
-      console.log('Webhook secret verification failed')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // Parse update
     const update: TelegramUpdate = await request.json()
-    console.log('Received update:', JSON.stringify(update, null, 2))
 
     // Handle different update types
     if (update.message) {
-      console.log('Handling message:', update.message.text)
-      // Не ждём завершения - обрабатываем асинхронно
-      handleMessage(update).catch(err => {
-        console.error('Error handling message:', err)
-      })
+      await handleMessage(update)
     } else if (update.callback_query) {
-      console.log('Handling callback query:', update.callback_query.data)
-      // Не ждём завершения - обрабатываем асинхронно
-      handleCallbackQuery(update).catch(err => {
-        console.error('Error handling callback query:', err)
-      })
+      await handleCallbackQuery(update)
     }
 
-    // Всегда возвращаем успех сразу, чтобы Telegram не удалял webhook
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Bot webhook error:', error)
-    // Даже при ошибке возвращаем 200, чтобы Telegram не удалял webhook
-    return NextResponse.json({ ok: true })
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 
@@ -101,24 +92,16 @@ async function handleCallbackQuery(update: TelegramUpdate) {
 async function handleStartCommand(chatId: number, firstName: string) {
   const miniAppUrl = process.env.NEXT_PUBLIC_MINIAPP_URL || 'http://localhost:3002'
   
-  console.log('handleStartCommand called:', { chatId, firstName, miniAppUrl })
-  
-  try {
-    const response = await sendMessage(
-      chatId,
-      getWelcomeMessage(firstName),
-      {
-        parse_mode: 'Markdown',
-        reply_markup: {
-          inline_keyboard: createMiniAppKeyboard(miniAppUrl),
-        },
-      }
-    )
-    
-    console.log('sendMessage response status:', response.status)
-  } catch (error) {
-    console.error('Error in handleStartCommand:', error)
-  }
+  await sendMessage(
+    chatId,
+    getWelcomeMessage(firstName),
+    {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: createMiniAppKeyboard(miniAppUrl),
+      },
+    }
+  )
 
   // TODO: Create user in database if doesn't exist
   // await createUserIfNotExists(chatId)

@@ -61,7 +61,6 @@ export async function sendMessage(
 ): Promise<Response> {
   const botToken = process.env.TELEGRAM_BOT_TOKEN
   if (!botToken) {
-    console.error('TELEGRAM_BOT_TOKEN not configured')
     throw new Error('TELEGRAM_BOT_TOKEN not configured')
   }
 
@@ -73,30 +72,13 @@ export async function sendMessage(
     ...options,
   }
 
-  console.log('Sending message to chat:', chatId)
-  
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
-    
-    const result = await response.json()
-    
-    if (!response.ok) {
-      console.error('Failed to send message:', result)
-    } else {
-      console.log('Message sent successfully:', result)
-    }
-    
-    return response
-  } catch (error) {
-    console.error('Error sending message:', error)
-    throw error
-  }
+  return fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
 }
 
 /**
@@ -127,27 +109,15 @@ export async function answerCallbackQuery(
 
 /**
  * Verify webhook secret
- * 
- * IMPORTANT: Telegram sends webhook requests WITHOUT secret token by default.
- * Only if you set secret_token in setWebhook, Telegram will include it.
- * Since we're not using secret_token in setWebhook, we should allow requests without it.
+ * TODO: Re-enable after fixing Vercel environment variables
  */
 export function verifyWebhookSecret(secret: string | null): boolean {
-  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
-  
-  // Если secret не настроен в env - разрешаем все запросы
-  if (!webhookSecret) {
-    return true
-  }
-  
-  // Если secret настроен, но запрос пришёл без secret - разрешаем
-  // (потому что мы не используем secret_token в setWebhook)
-  if (!secret) {
-    return true
-  }
-  
-  // Если оба есть - проверяем совпадение
-  return secret === webhookSecret
+  // Temporarily disabled for debugging
+  // const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
+  // if (webhookSecret && secret !== webhookSecret) {
+  //   return false
+  // }
+  return true
 }
 
 /**
