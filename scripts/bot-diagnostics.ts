@@ -175,9 +175,8 @@ async function checkMenuButton(token: string): Promise<boolean> {
 async function checkBotEndpoint(): Promise<boolean> {
   try {
     console.log('\n🌐 Проверка endpoint бота...');
-    const endpointUrl = process.env.NEXT_PUBLIC_MINIAPP_URL
-      ? `${process.env.NEXT_PUBLIC_MINIAPP_URL}/api/bot`
-      : 'https://app.outlivion.space/api/bot';
+    // Всегда проверяем production endpoint
+    const endpointUrl = 'https://app.outlivion.space/api/bot';
 
     const response = await axios.get(endpointUrl, { timeout: 5000 });
     const data = response.data;
@@ -198,6 +197,13 @@ async function checkBotEndpoint(): Promise<boolean> {
     }
   } catch (error: any) {
     console.error('❌ Ошибка при проверке endpoint:', error.message);
+    if (error.response) {
+      console.error('   HTTP Status:', error.response.status);
+      console.error('   Response:', JSON.stringify(error.response.data, null, 2));
+    }
+    if (error.code) {
+      console.error('   Error Code:', error.code);
+    }
     return false;
   }
 }
