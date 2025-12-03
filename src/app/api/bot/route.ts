@@ -11,7 +11,64 @@ import {
 
 /**
  * Telegram Bot Webhook Handler
- * POST /api/bot
+ * GET /api/bot - Status page
+ * POST /api/bot - Webhook endpoint
+ */
+
+/**
+ * GET /api/bot - Status page для проверки работоспособности
+ */
+export async function GET(request: NextRequest) {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN
+  // Определяем webhook URL
+  let webhookUrl = 'https://app.outlivion.space/api/bot'
+  if (process.env.NEXT_PUBLIC_MINIAPP_URL) {
+    const miniAppUrl = process.env.NEXT_PUBLIC_MINIAPP_URL.trim()
+    if (miniAppUrl.startsWith('https://')) {
+      webhookUrl = `${miniAppUrl}/api/bot`
+    }
+  }
+  
+  // Пытаемся получить информацию о webhook
+  let webhookInfo = null
+  if (botToken) {
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${botToken}/getWebhookInfo`)
+      const data = await response.json()
+      if (data.ok) {
+        webhookInfo = data.result
+      }
+    } catch (error) {
+      // Игнорируем ошибки
+    }
+  }
+  
+  const status = {
+    service: 'Telegram Bot Webhook',
+    status: 'operational',
+    webhook: {
+      url: webhookUrl,
+      configured: !!webhookInfo?.url,
+      pendingUpdates: webhookInfo?.pending_update_count || 0,
+      lastError: webhookInfo?.last_error_message || null,
+      allowedUpdates: webhookInfo?.allowed_updates || [],
+    },
+    bot: {
+      tokenConfigured: !!botToken,
+      tokenFormat: botToken ? (botToken.match(/^\d+:/) ? 'valid' : 'invalid') : 'not set',
+    },
+    timestamp: new Date().toISOString(),
+  }
+  
+  return NextResponse.json(status, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+}
+
+/**
+ * POST /api/bot - Webhook endpoint для получения обновлений от Telegram
  */
 export async function POST(request: NextRequest) {
   try {
