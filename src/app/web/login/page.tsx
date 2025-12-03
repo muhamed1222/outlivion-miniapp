@@ -2,16 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { loginWithTelegramWidget, isAuthenticated, TelegramAuthData } from '@/lib/auth';
-import TelegramLoginButton from '@/components/TelegramLoginButton';
+import { isAuthenticated } from '@/lib/auth';
+import { tokenStorage, userStorage } from '@/lib/storage';
+import TelegramBotLogin from '@/components/TelegramBotLogin';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Bot configuration
-  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || 'outlivionbot';
 
   useEffect(() => {
     // Check if already authenticated
@@ -21,28 +18,31 @@ export default function LoginPage() {
     }
   }, [router]);
 
-  // Handle Telegram authentication
-  const handleTelegramAuth = async (user: TelegramAuthData) => {
-    console.log('[Login] Telegram auth callback triggered', user);
-    setLoading(true);
-    setError(null);
+  // Handle successful login via bot
+  const handleLoginSuccess = (data: {
+    accessToken: string;
+    refreshToken: string;
+    user: any;
+  }) => {
+    console.log('[Login] Bot login successful', data.user);
 
-    try {
-      const result = await loginWithTelegramWidget(user);
-      
-      if (result.success) {
-        console.log('[Login] Login successful, redirecting to dashboard');
-        router.push('/web/dashboard');
-      } else {
-        console.error('[Login] Login failed:', result.error);
-        setError(result.error || 'Ошибка авторизации');
-        setLoading(false);
-      }
-    } catch (err: any) {
-      console.error('[Login] Login error:', err);
-      setError(err.message || 'Ошибка авторизации');
-      setLoading(false);
+    // Store tokens
+    tokenStorage.setTokens(data.accessToken, data.refreshToken);
+
+    // Store user data
+    userStorage.setUser(data.user);
+    if (data.user.telegramId) {
+      userStorage.setTelegramId(data.user.telegramId);
     }
+
+    // Redirect to dashboard
+    router.push('/web/dashboard');
+  };
+
+  // Handle login error
+  const handleLoginError = (errorMessage: string) => {
+    console.error('[Login] Bot login error:', errorMessage);
+    setError(errorMessage);
   };
 
 
@@ -81,23 +81,12 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Telegram Login Widget */}
+            {/* Telegram Bot Login */}
             <div className="mb-8">
-              <TelegramLoginButton
-                botUsername={botUsername}
-                onAuth={handleTelegramAuth}
-                buttonSize="large"
-                cornerRadius={12}
-                requestWriteAccess={true}
-                lang="ru"
+              <TelegramBotLogin
+                onSuccess={handleLoginSuccess}
+                onError={handleLoginError}
               />
-              
-              {/* Helper text for development */}
-              {process.env.NODE_ENV === 'development' && (
-                <p className="mt-3 text-xs text-neutral-500 text-center">
-                  Dev: Бот @{botUsername}
-                </p>
-              )}
             </div>
 
             {/* Divider */}
@@ -154,15 +143,6 @@ export default function LoginPage() {
         <span>Политика конфиденциальности</span>
       </div>
 
-      {/* Loading overlay */}
-      {loading && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-8 flex flex-col items-center">
-            <div className="w-12 h-12 border-4 border-[#F55128] border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-white font-medium">Выполняется вход...</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

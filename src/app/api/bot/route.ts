@@ -9,6 +9,12 @@ import {
   getFAQMessage,
 } from '@/lib/bot'
 import { createOrUpdateUser, getUserSubscription } from '@/lib/bot-api'
+import { 
+  parseLoginCommand, 
+  confirmBotLogin, 
+  getLoginConfirmedMessage,
+  getLoginErrorMessage 
+} from '@/lib/bot-deep-link-auth'
 
 /**
  * Telegram Bot Webhook Handler
@@ -162,7 +168,16 @@ async function handleMessage(update: TelegramUpdate) {
 
   // Handle commands
   if (text.startsWith('/start')) {
-    await handleStartCommand(chatId, message.from)
+    // Check if this is a deep-link login command
+    const loginToken = parseLoginCommand(text)
+    
+    if (loginToken) {
+      // Handle deep-link login
+      await handleDeepLinkLogin(chatId, message.from, loginToken)
+    } else {
+      // Regular /start command
+      await handleStartCommand(chatId, message.from)
+    }
   } else if (text.startsWith('/help')) {
     await handleHelpCommand(chatId)
   } else if (text.startsWith('/status')) {
@@ -246,6 +261,65 @@ async function handleCallbackQuery(update: TelegramUpdate) {
     }
     console.error('[BOT] Error handling callback query:', JSON.stringify(errorDetails, null, 2))
     await answerCallback('Произошла ошибка при обработке запроса')
+  }
+}
+
+/**
+ * Handle deep-link login via /start login_<TOKEN>
+ */
+async function handleDeepLinkLogin(
+  chatId: number,
+  from: { id: number; first_name: string; last_name?: string; username?: string },
+  token: string
+) {
+  console.log('[BOT] Handling deep-link login:', { chatId, telegramId: from.id, token })
+
+  try {
+    // Confirm login on backend
+    const result = await confirmBotLogin({
+      token,
+      telegramId: String(from.id),
+      username: from.username,
+      firstName: from.first_name,
+      lastName: from.last_name,
+    })
+
+    if (result.ok) {
+      // Login successful
+      console.log('[BOT] Deep-link login confirmed:', { chatId, telegramId: from.id })
+      
+      const successMessage = getLoginConfirmedMessage(from.first_name)
+      
+      await sendMessage(chatId, successMessage, {
+        parse_mode: 'Markdown',
+      })
+    } else {
+      // Login failed
+      console.error('[BOT] Deep-link login failed:', { 
+        chatId, 
+        telegramId: from.id, 
+        error: result.error 
+      })
+      
+      const errorMessage = getLoginErrorMessage(result.error)
+      
+      await sendMessage(chatId, errorMessage, {
+        parse_mode: 'Markdown',
+      })
+    }
+  } catch (error: any) {
+    console.error('[BOT] Deep-link login error:', {
+      error: error.message,
+      chatId,
+      telegramId: from.id,
+      token,
+    })
+    
+    const errorMessage = getLoginErrorMessage(error.message)
+    
+    await sendMessage(chatId, errorMessage, {
+      parse_mode: 'Markdown',
+    })
   }
 }
 
