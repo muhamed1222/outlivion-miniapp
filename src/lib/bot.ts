@@ -74,26 +74,34 @@ export async function sendMessage(
 
   console.log('[BOT] Sending message to Telegram API:', { chatId, textLength: text.length })
   
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
-  
-  const result = await response.json()
-  console.log('[BOT] Telegram API response:', { 
-    ok: result.ok, 
-    status: response.status,
-    error: result.error_code || result.description 
-  })
-  
-  if (!response.ok || !result.ok) {
-    console.error('[BOT] Telegram API error:', result)
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    })
+    
+    // Клонируем response чтобы можно было прочитать его несколько раз
+    const responseClone = response.clone()
+    const result = await responseClone.json()
+    
+    console.log('[BOT] Telegram API response:', { 
+      ok: result.ok, 
+      status: response.status,
+      error: result.error_code || result.description 
+    })
+    
+    if (!response.ok || !result.ok) {
+      console.error('[BOT] Telegram API error:', result)
+    }
+    
+    return response
+  } catch (error) {
+    console.error('[BOT] Error sending message:', error)
+    throw error
   }
-  
-  return response
 }
 
 /**

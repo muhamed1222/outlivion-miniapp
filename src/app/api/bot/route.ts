@@ -107,7 +107,7 @@ async function handleStartCommand(chatId: number, firstName: string) {
   console.log('[BOT] handleStartCommand:', { chatId, firstName, miniAppUrl })
   
   try {
-    const response = await sendMessage(
+    await sendMessage(
       chatId,
       getWelcomeMessage(firstName),
       {
@@ -117,17 +117,7 @@ async function handleStartCommand(chatId: number, firstName: string) {
         },
       }
     )
-    
-    const result = await response.json()
-    console.log('[BOT] sendMessage result:', { 
-      ok: result.ok, 
-      status: response.status,
-      error: result.error_code || result.description 
-    })
-    
-    if (!response.ok || !result.ok) {
-      console.error('[BOT] Failed to send message:', result)
-    }
+    console.log('[BOT] Message sent successfully')
   } catch (error) {
     console.error('[BOT] Error in handleStartCommand:', error)
     throw error
