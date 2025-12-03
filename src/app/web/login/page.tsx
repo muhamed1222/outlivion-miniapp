@@ -3,84 +3,58 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { loginWithTelegramWidget, isAuthenticated, TelegramAuthData } from '@/lib/auth';
-
-declare global {
-  interface Window {
-    onTelegramAuth?: (user: TelegramAuthData) => void;
-  }
-}
+import TelegramLoginButton from '@/components/TelegramLoginButton';
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLocalhost, setIsLocalhost] = useState(false);
-  const [useMockMode, setUseMockMode] = useState(false);
+
+  // Bot configuration
+  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || 'outlivionbot';
 
   useEffect(() => {
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const mockMode = isLocal && process.env.NEXT_PUBLIC_USE_MOCK_TELEGRAM === 'true';
-    
-    setIsLocalhost(isLocal);
-    setUseMockMode(mockMode);
-
     // Check if already authenticated
     if (isAuthenticated()) {
       router.push('/web/dashboard');
       return;
     }
-
-    // Setup Telegram Login Widget callback
-    window.onTelegramAuth = async (user: TelegramAuthData) => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const result = await loginWithTelegramWidget(user);
-        
-        if (result.success) {
-          router.push('/web/dashboard');
-        } else {
-          setError(result.error || 'Ошибка авторизации');
-          setLoading(false);
-        }
-      } catch (err: any) {
-        console.error('Login error:', err);
-        setError(err.message || 'Ошибка авторизации');
-        setLoading(false);
-      }
-    };
-
-    return () => {
-      if (window.onTelegramAuth) {
-        delete window.onTelegramAuth;
-      }
-    };
   }, [router]);
 
-  const handleMockLogin = () => {
-    const mockUser: TelegramAuthData = {
-      id: '123456789',
-      first_name: 'Test',
-      last_name: 'User',
-      username: 'testuser',
-      auth_date: Math.floor(Date.now() / 1000).toString(),
-      hash: 'mock_hash_for_development'
-    };
-    if (window.onTelegramAuth) {
-      window.onTelegramAuth(mockUser);
+  // Handle Telegram authentication
+  const handleTelegramAuth = async (user: TelegramAuthData) => {
+    console.log('[Login] Telegram auth callback triggered', user);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await loginWithTelegramWidget(user);
+      
+      if (result.success) {
+        console.log('[Login] Login successful, redirecting to dashboard');
+        router.push('/web/dashboard');
+      } else {
+        console.error('[Login] Login failed:', result.error);
+        setError(result.error || 'Ошибка авторизации');
+        setLoading(false);
+      }
+    } catch (err: any) {
+      console.error('[Login] Login error:', err);
+      setError(err.message || 'Ошибка авторизации');
+      setLoading(false);
     }
   };
 
+
   return (
     <div className="min-h-screen bg-black flex justify-center">
-      {/* Gradient background - orange blur top left */}
-      <div 
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background: 'radial-gradient(ellipse at 0% 0%, rgba(245, 81, 40, 0.25) 0%, transparent 40%)',
-        }}
-      />
+        {/* Gradient background - orange blur top left */}
+        <div 
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'radial-gradient(ellipse at 0% 0%, rgba(245, 81, 40, 0.25) 0%, transparent 40%)',
+          }}
+        />
       
       {/* Content */}
       <div className="relative z-10 w-full max-w-[448px] flex items-center px-4 py-8">
@@ -107,33 +81,22 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Telegram login button */}
-            <div className="space-y-4 mb-8">
-              {isLocalhost && useMockMode ? (
-                <button
-                  onClick={handleMockLogin}
-                  disabled={loading}
-                  className="w-full py-4 px-6 bg-[#F55128] hover:bg-[#e04520] text-white font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-50"
-                >
-                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
-                  </svg>
-                  {loading ? 'Вход...' : 'Войти через Telegram'}
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    if (isLocalhost) {
-                      setError('Для авторизации через Telegram используйте туннель (npx localtunnel --port 3000)');
-                    }
-                  }}
-                  className="w-full py-4 px-6 bg-[#F55128] hover:bg-[#e04520] text-white font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-3"
-                >
-                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
-                  </svg>
-                  Войти через Telegram
-                </button>
+            {/* Telegram Login Widget */}
+            <div className="mb-8">
+              <TelegramLoginButton
+                botUsername={botUsername}
+                onAuth={handleTelegramAuth}
+                buttonSize="large"
+                cornerRadius={12}
+                requestWriteAccess={true}
+                lang="ru"
+              />
+              
+              {/* Helper text for development */}
+              {process.env.NODE_ENV === 'development' && (
+                <p className="mt-3 text-xs text-neutral-500 text-center">
+                  Dev: Бот @{botUsername}
+                </p>
               )}
             </div>
 
@@ -185,8 +148,9 @@ export default function LoginPage() {
         </div>
 
       {/* Footer */}
-      <div className="absolute bottom-0 left-0 right-0 px-6 py-4 flex items-center justify-center text-neutral-600 text-sm max-w-[448px]">
+      <div className="absolute bottom-0 left-0 right-0 px-6 py-4 flex items-center justify-center gap-4 text-neutral-600 text-sm max-w-[448px] mx-auto">
         <span>Русский</span>
+        <span className="text-neutral-700">•</span>
         <span>Политика конфиденциальности</span>
       </div>
 
