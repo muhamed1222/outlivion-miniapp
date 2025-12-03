@@ -8,6 +8,7 @@ import {
   getWelcomeMessage,
   getFAQMessage,
 } from '@/lib/bot'
+import { createOrUpdateUser, getUserSubscription } from '@/lib/bot-api'
 
 /**
  * Telegram Bot Webhook Handler
@@ -161,7 +162,7 @@ async function handleMessage(update: TelegramUpdate) {
 
   // Handle commands
   if (text.startsWith('/start')) {
-    await handleStartCommand(chatId, message.from.first_name)
+    await handleStartCommand(chatId, message.from)
   } else if (text.startsWith('/help')) {
     await handleHelpCommand(chatId)
   } else if (text.startsWith('/status')) {
@@ -251,7 +252,9 @@ async function handleCallbackQuery(update: TelegramUpdate) {
 /**
  * Handle /start command
  */
-async function handleStartCommand(chatId: number, firstName: string) {
+async function handleStartCommand(chatId: number, from: any) {
+  const firstName = from.first_name || 'Пользователь';
+  
   // Определяем URL для Mini App
   // Используем NEXT_PUBLIC_MINIAPP_URL или дефолтный production URL
   let miniAppUrl = (process.env.NEXT_PUBLIC_MINIAPP_URL || 'https://app.outlivion.space').trim()
@@ -268,9 +271,33 @@ async function handleStartCommand(chatId: number, firstName: string) {
   // Добавляем путь /telegram для Mini App
   const webAppUrl = `${miniAppUrl}/telegram`
   
-  console.log('[BOT] handleStartCommand:', { chatId, firstName, miniAppUrl, webAppUrl })
+  console.log('[BOT] handleStartCommand:', { 
+    chatId, 
+    firstName, 
+    telegramId: from.id,
+    username: from.username,
+    miniAppUrl, 
+    webAppUrl 
+  })
   
   try {
+    // Создаём или обновляем пользователя в БД через backend API
+    console.log('[BOT] Creating/updating user in database...')
+    const userResult = await createOrUpdateUser({
+      telegramId: from.id,
+      firstName: from.first_name,
+      lastName: from.last_name,
+      username: from.username,
+      photoUrl: from.photo_url,
+    })
+    
+    if (userResult.success) {
+      console.log('[BOT] User created/updated in database:', userResult.userId)
+    } else {
+      console.warn('[BOT] Failed to create/update user in database:', userResult.error)
+      // Продолжаем работу даже если не удалось создать пользователя
+    }
+    
     console.log('[BOT] Attempting to send welcome message...')
     
     // Используем функцию getWelcomeMessage для консистентности
@@ -280,12 +307,12 @@ async function handleStartCommand(chatId: number, firstName: string) {
     const keyboard = createMiniAppKeyboard(webAppUrl)
     console.log('[BOT] Keyboard created:', JSON.stringify(keyboard, null, 2))
     
-    // Отправляем сообщение (без Markdown временно)
+    // Отправляем сообщение с Markdown форматированием
     const result = await sendMessage(
       chatId,
       welcomeText,
       {
-        // parse_mode: 'Markdown', // Временно отключаем Markdown
+        parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: keyboard,
         },
@@ -299,9 +326,6 @@ async function handleStartCommand(chatId: number, firstName: string) {
     console.error('[BOT] Error stack:', error instanceof Error ? error.stack : 'No stack')
     // Не пробрасываем ошибку, чтобы не сломать webhook
   }
-
-  // TODO: Create user in database if doesn't exist
-  // await createUserIfNotExists(chatId)
 }
 
 /**
@@ -332,23 +356,53 @@ async function handleHelpCommand(chatId: number) {
  * Handle /status command
  */
 async function handleStatusCommand(chatId: number, userId: number) {
-  // TODO: Get subscription status from API
-  const statusText = `
+  try {
+    console.log('[BOT] Getting subscription status for user:', userId)
+    
+    // Получаем статус подписки из API
+    const subscriptionResult = await getUserSubscription(userId)
+    
+    let statusText = ''
+    
+    if (subscriptionResult.success && subscriptionResult.subscription) {
+      const sub = subscriptionResult.subscription
+      const endDate = new Date(sub.endDate)
+      const daysLeft = Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      
+      statusText = `
 📊 **Статус вашей подписки:**
 
-❓ Чтобы узнать статус подписки, откройте Mini App.
-  `.trim()
+📦 Тариф: ${sub.plan === 'monthly' ? 'Месячный' : sub.plan === 'yearly' ? 'Годовой' : sub.plan}
+${sub.status === 'active' ? '✅ Статус: Активна' : '⚠️ Статус: ' + sub.status}
+📅 Действует до: ${endDate.toLocaleDateString('ru-RU')}
+⏰ Осталось дней: ${daysLeft > 0 ? daysLeft : 'Истекла'}
+      `.trim()
+    } else {
+      // Подписка не найдена
+      statusText = `
+📊 **Статус вашей подписки:**
 
-  const miniAppUrl = (process.env.NEXT_PUBLIC_MINIAPP_URL || 'http://localhost:3002').trim()
+❌ У вас пока нет активной подписки.
 
-  await sendMessage(chatId, statusText, {
-    parse_mode: 'Markdown',
-    reply_markup: {
-      inline_keyboard: [[{
-        text: '🚀 Открыть Mini App',
-        web_app: { url: miniAppUrl },
-      }]],
-    },
-  })
+Откройте Mini App, чтобы купить подписку и начать пользоваться VPN! 👇
+      `.trim()
+    }
+
+    const miniAppUrl = (process.env.NEXT_PUBLIC_MINIAPP_URL || 'http://localhost:3002').trim()
+
+    await sendMessage(chatId, statusText, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [[{
+          text: '🚀 Открыть Mini App',
+          web_app: { url: miniAppUrl },
+        }]],
+      },
+    })
+  } catch (error) {
+    console.error('[BOT] Error in handleStatusCommand:', error)
+    // Fallback на простое сообщение
+    await sendMessage(chatId, '❌ Ошибка при получении статуса подписки. Попробуйте позже.')
+  }
 }
 
