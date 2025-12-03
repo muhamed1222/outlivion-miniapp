@@ -84,9 +84,8 @@ export async function sendMessage(
       body: JSON.stringify(body),
     })
     
-    // Клонируем response чтобы можно было прочитать его несколько раз
-    const responseClone = response.clone()
-    const result = await responseClone.json()
+    // Читаем response один раз
+    const result = await response.json()
     
     console.log('[BOT] Telegram API response:', { 
       ok: result.ok, 
@@ -97,11 +96,19 @@ export async function sendMessage(
     
     if (!response.ok || !result.ok) {
       console.error('[BOT] Telegram API error details:', JSON.stringify(result, null, 2))
+      // Пробрасываем ошибку чтобы увидеть её в логах
+      throw new Error(`Telegram API error: ${result.description || 'Unknown error'}`)
     }
     
-    return response
+    console.log('[BOT] Message sent successfully to chatId:', chatId)
+    // Возвращаем новый Response с результатом
+    return new Response(JSON.stringify(result), {
+      status: response.status,
+      headers: response.headers
+    })
   } catch (error) {
     console.error('[BOT] Error sending message:', error)
+    // Пробрасываем ошибку чтобы увидеть её в логах
     throw error
   }
 }

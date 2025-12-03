@@ -31,25 +31,31 @@ export async function POST(request: NextRequest) {
         text: update.message.text,
         from: update.message.from.first_name
       })
+      // Обрабатываем синхронно чтобы увидеть ошибки
       try {
         await handleMessage(update)
         console.log('[BOT] Message handled successfully')
       } catch (error) {
         console.error('[BOT] Error handling message:', error)
-        throw error
+        // Логируем но продолжаем
       }
     } else if (update.callback_query) {
       console.log('[BOT] Received callback:', update.callback_query.data)
-      await handleCallbackQuery(update)
+      try {
+        await handleCallbackQuery(update)
+        console.log('[BOT] Callback handled successfully')
+      } catch (error) {
+        console.error('[BOT] Error handling callback:', error)
+        // Логируем но продолжаем
+      }
     }
 
+    // ВСЕГДА возвращаем 200 OK, чтобы Telegram не удалил webhook
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Bot webhook error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    // Даже при ошибке возвращаем 200 OK, чтобы не удалился webhook
+    return NextResponse.json({ ok: true })
   }
 }
 
@@ -107,20 +113,40 @@ async function handleStartCommand(chatId: number, firstName: string) {
   console.log('[BOT] handleStartCommand:', { chatId, firstName, miniAppUrl })
   
   try {
-    await sendMessage(
+    // Сначала отправляем простое сообщение для теста
+    console.log('[BOT] Attempting to send welcome message...')
+    
+    const welcomeText = `👋 Привет, ${firstName}!
+
+Добро пожаловать в Outlivion VPN — ваш надежный и быстрый VPN сервис.
+
+🔐 Что мы предлагаем:
+• Высокая скорость подключения
+• Серверы по всему миру
+• Военное шифрование AES-256
+• Полная анонимность, без логов
+
+Нажмите кнопку ниже, чтобы начать! 👇`
+
+    const keyboard = createMiniAppKeyboard(miniAppUrl)
+    console.log('[BOT] Keyboard created:', JSON.stringify(keyboard, null, 2))
+    
+    const result = await sendMessage(
       chatId,
-      getWelcomeMessage(firstName),
+      welcomeText,
       {
-        parse_mode: 'Markdown',
         reply_markup: {
-          inline_keyboard: createMiniAppKeyboard(miniAppUrl),
+          inline_keyboard: keyboard,
         },
       }
     )
+    
+    console.log('[BOT] sendMessage completed, result status:', result.status)
     console.log('[BOT] Message sent successfully')
   } catch (error) {
     console.error('[BOT] Error in handleStartCommand:', error)
-    throw error
+    console.error('[BOT] Error stack:', error instanceof Error ? error.stack : 'No stack')
+    // Не пробрасываем ошибку, чтобы не сломать webhook
   }
 
   // TODO: Create user in database if doesn't exist
