@@ -29,19 +29,24 @@ export async function POST(request: NextRequest) {
     // Handle different update types
     if (update.message) {
       console.log('Handling message:', update.message.text)
-      await handleMessage(update)
+      // Не ждём завершения - обрабатываем асинхронно
+      handleMessage(update).catch(err => {
+        console.error('Error handling message:', err)
+      })
     } else if (update.callback_query) {
       console.log('Handling callback query:', update.callback_query.data)
-      await handleCallbackQuery(update)
+      // Не ждём завершения - обрабатываем асинхронно
+      handleCallbackQuery(update).catch(err => {
+        console.error('Error handling callback query:', err)
+      })
     }
 
+    // Всегда возвращаем успех сразу, чтобы Telegram не удалял webhook
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('Bot webhook error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    // Даже при ошибке возвращаем 200, чтобы Telegram не удалял webhook
+    return NextResponse.json({ ok: true })
   }
 }
 

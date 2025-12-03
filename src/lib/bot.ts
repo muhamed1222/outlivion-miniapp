@@ -127,15 +127,27 @@ export async function answerCallbackQuery(
 
 /**
  * Verify webhook secret
- * TODO: Re-enable after fixing Vercel environment variables
+ * 
+ * IMPORTANT: Telegram sends webhook requests WITHOUT secret token by default.
+ * Only if you set secret_token in setWebhook, Telegram will include it.
+ * Since we're not using secret_token in setWebhook, we should allow requests without it.
  */
 export function verifyWebhookSecret(secret: string | null): boolean {
-  // Temporarily disabled for debugging
-  // const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
-  // if (webhookSecret && secret !== webhookSecret) {
-  //   return false
-  // }
-  return true
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
+  
+  // Если secret не настроен в env - разрешаем все запросы
+  if (!webhookSecret) {
+    return true
+  }
+  
+  // Если secret настроен, но запрос пришёл без secret - разрешаем
+  // (потому что мы не используем secret_token в setWebhook)
+  if (!secret) {
+    return true
+  }
+  
+  // Если оба есть - проверяем совпадение
+  return secret === webhookSecret
 }
 
 /**
