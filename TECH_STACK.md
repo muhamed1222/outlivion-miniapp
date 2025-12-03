@@ -164,20 +164,31 @@ https://app.outlivion.space/api/bot
 
 ## 🔐 Критические переменные окружения
 
+### Production (Vercel)
 ```env
 # API (ОБЯЗАТЕЛЬНО!)
 NEXT_PUBLIC_API_URL=https://api.outlivion.space
 
-# Telegram Bot (для сервера)
+# Telegram Bot (только на сервере, НЕ NEXT_PUBLIC!)
 TELEGRAM_BOT_TOKEN=8477147639:AAEVS_D_A4avYXPOku78AWiYbiirOgglpbw
-TELEGRAM_WEBHOOK_SECRET=your_webhook_secret
+TELEGRAM_WEBHOOK_SECRET=your_webhook_secret_min_32_chars
 
 # Telegram (для клиента)
 NEXT_PUBLIC_TELEGRAM_BOT_NAME=outlivionbot
-NEXT_PUBLIC_MINIAPP_URL=https://bot.outlivion.space
+NEXT_PUBLIC_MINIAPP_URL=https://app.outlivion.space
 
 # Environment
 NODE_ENV=production
+```
+
+### Development (Local)
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001
+TELEGRAM_BOT_TOKEN=8477147639:AAEVS_D_A4avYXPOku78AWiYbiirOgglpbw
+TELEGRAM_WEBHOOK_SECRET=your_webhook_secret
+NEXT_PUBLIC_TELEGRAM_BOT_NAME=outlivionbot
+NEXT_PUBLIC_MINIAPP_URL=http://localhost:3002
+NODE_ENV=development
 ```
 
 ---
@@ -286,12 +297,12 @@ npm run bot:diagnostics  # Диагностика бота
 ## 🔗 Связи с другими компонентами
 
 ```
-Telegram Bot
+Telegram Bot (@outlivionbot)
     ↓ Webhook
-Mini App (/api/bot)
+Mini App (app.outlivion.space/api/bot)
     ↓ REST API + JWT
 API (api.outlivion.space)
-    ↓
+    ↓ SQL + SSL
 Neon PostgreSQL + Marzban + Mercuryo
 ```
 
