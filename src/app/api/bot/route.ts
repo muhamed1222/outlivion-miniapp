@@ -254,7 +254,7 @@ async function handleCallbackQuery(update: TelegramUpdate) {
 async function handleStartCommand(chatId: number, firstName: string) {
   // Определяем URL для Mini App
   // Используем NEXT_PUBLIC_MINIAPP_URL или дефолтный production URL
-  let miniAppUrl = process.env.NEXT_PUBLIC_MINIAPP_URL || 'https://app.outlivion.space'
+  let miniAppUrl = (process.env.NEXT_PUBLIC_MINIAPP_URL || 'https://app.outlivion.space').trim()
   
   // Убеждаемся что URL правильный (должен быть полный URL с протоколом)
   if (!miniAppUrl.startsWith('http')) {
@@ -262,8 +262,8 @@ async function handleStartCommand(chatId: number, firstName: string) {
     miniAppUrl = 'https://app.outlivion.space'
   }
   
-  // Убираем trailing slash если есть
-  miniAppUrl = miniAppUrl.replace(/\/$/, '')
+  // Убираем trailing slash и любые пробелы/переносы строк
+  miniAppUrl = miniAppUrl.trim().replace(/\/$/, '')
   
   // Добавляем путь /telegram для Mini App
   const webAppUrl = `${miniAppUrl}/telegram`
@@ -318,7 +318,7 @@ async function handleHelpCommand(chatId: number) {
 Для управления VPN откройте Mini App! 👇
   `.trim()
 
-  const miniAppUrl = process.env.NEXT_PUBLIC_MINIAPP_URL || 'http://localhost:3002'
+  const miniAppUrl = (process.env.NEXT_PUBLIC_MINIAPP_URL || 'http://localhost:3002').trim()
 
   await sendMessage(chatId, helpText, {
     parse_mode: 'Markdown',
@@ -339,7 +339,7 @@ async function handleStatusCommand(chatId: number, userId: number) {
 ❓ Чтобы узнать статус подписки, откройте Mini App.
   `.trim()
 
-  const miniAppUrl = process.env.NEXT_PUBLIC_MINIAPP_URL || 'http://localhost:3002'
+  const miniAppUrl = (process.env.NEXT_PUBLIC_MINIAPP_URL || 'http://localhost:3002').trim()
 
   await sendMessage(chatId, statusText, {
     parse_mode: 'Markdown',
