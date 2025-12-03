@@ -36,7 +36,15 @@ export async function POST(request: NextRequest) {
         await handleMessage(update)
         console.log('[BOT] Message handled successfully')
       } catch (error) {
-        console.error('[BOT] Error handling message:', error)
+        const errorDetails = {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          chatId: update.message?.chat.id,
+          userId: update.message?.from.id,
+          text: update.message?.text,
+          timestamp: new Date().toISOString(),
+        }
+        console.error('[BOT] Error handling message:', JSON.stringify(errorDetails, null, 2))
         // Логируем но продолжаем
       }
     } else if (update.callback_query) {
@@ -45,7 +53,16 @@ export async function POST(request: NextRequest) {
         await handleCallbackQuery(update)
         console.log('[BOT] Callback handled successfully')
       } catch (error) {
-        console.error('[BOT] Error handling callback:', error)
+        const errorDetails = {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          queryId: update.callback_query?.id,
+          data: update.callback_query?.data,
+          chatId: update.callback_query?.message?.chat.id,
+          userId: update.callback_query?.from.id,
+          timestamp: new Date().toISOString(),
+        }
+        console.error('[BOT] Error handling callback:', JSON.stringify(errorDetails, null, 2))
         // Логируем но продолжаем
       }
     }
@@ -53,8 +70,24 @@ export async function POST(request: NextRequest) {
     // ВСЕГДА возвращаем 200 OK, чтобы Telegram не удалил webhook
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('Bot webhook error:', error)
+    // Детальное логирование ошибок для диагностики
+    const errorDetails = {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+      timestamp: new Date().toISOString(),
+      // Дополнительный контекст если доступен
+      requestHeaders: {
+        contentType: request.headers.get('content-type'),
+        userAgent: request.headers.get('user-agent'),
+        hasSecretToken: !!request.headers.get('x-telegram-bot-api-secret-token'),
+      },
+    }
+    
+    console.error('[BOT] Webhook error:', JSON.stringify(errorDetails, null, 2))
+    
     // Даже при ошибке возвращаем 200 OK, чтобы не удалился webhook
+    // Telegram удаляет webhook если получает не 200 OK
     return NextResponse.json({ ok: true })
   }
 }
@@ -85,22 +118,76 @@ async function handleMessage(update: TelegramUpdate) {
 async function handleCallbackQuery(update: TelegramUpdate) {
   const query = update.callback_query!
   const chatId = query.message?.chat.id
+  const callbackData = query.data
 
-  if (!chatId) return
+  // Вспомогательная функция для ответа на callback_query
+  const answerCallback = async (text?: string) => {
+    try {
+      await answerCallbackQuery(query.id, text)
+      console.log('[BOT] Callback query answered:', { queryId: query.id, text })
+    } catch (error) {
+      console.error('[BOT] Failed to answer callback query:', error)
+    }
+  }
 
-  const data = query.data
-
-  if (data === 'faq') {
-    await sendMessage(chatId, getFAQMessage(), {
-      parse_mode: 'Markdown',
+  // Если нет chatId, отвечаем и выходим
+  if (!chatId) {
+    console.warn('[BOT] Callback query without chatId:', {
+      queryId: query.id,
+      data: callbackData,
+      from: query.from.id,
     })
-    await answerCallbackQuery(query.id, 'FAQ открыт')
-  } else if (data === 'support') {
-    await sendMessage(
+    await answerCallback('Ошибка: не удалось определить чат')
+    return
+  }
+
+  // Если нет callback_data, отвечаем и выходим
+  if (!callbackData) {
+    console.warn('[BOT] Callback query without data:', {
+      queryId: query.id,
       chatId,
-      '💬 Для связи с поддержкой напишите: @outlivion_support'
-    )
-    await answerCallbackQuery(query.id)
+    })
+    await answerCallback('Ошибка: данные не получены')
+    return
+  }
+
+  // Обработка известных callback_data
+  try {
+    if (callbackData === 'faq') {
+      // Сначала отвечаем на callback (чтобы кнопка не "залипала")
+      await answerCallback('FAQ открыт')
+      // Потом отправляем сообщение
+      await sendMessage(chatId, getFAQMessage(), {
+        parse_mode: 'Markdown',
+      })
+    } else if (callbackData === 'support') {
+      // Сначала отвечаем на callback
+      await answerCallback()
+      // Потом отправляем сообщение
+      await sendMessage(
+        chatId,
+        '💬 Для связи с поддержкой напишите: @outlivion_support'
+      )
+    } else {
+      // Обработка неизвестных callback_data
+      console.warn('[BOT] Unknown callback_data:', {
+        data: callbackData,
+        chatId,
+        queryId: query.id,
+      })
+      await answerCallback('Неизвестная команда')
+    }
+  } catch (error) {
+    const errorDetails = {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      chatId,
+      callbackData,
+      queryId: query.id,
+      timestamp: new Date().toISOString(),
+    }
+    console.error('[BOT] Error handling callback query:', JSON.stringify(errorDetails, null, 2))
+    await answerCallback('Произошла ошибка при обработке запроса')
   }
 }
 

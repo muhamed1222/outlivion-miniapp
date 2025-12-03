@@ -47,6 +47,29 @@ export interface InlineKeyboardButton {
 }
 
 /**
+ * Validate Telegram Bot Token format
+ * Format should be: 123456:ABC-DEF...
+ */
+export function validateBotToken(token: string): boolean {
+  // Telegram bot token format: number:alphanumeric_string
+  return /^\d+:[A-Za-z0-9_-]+$/.test(token)
+}
+
+/**
+ * Get and validate bot token from environment
+ */
+function getBotToken(): string {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN
+  if (!botToken) {
+    throw new Error('TELEGRAM_BOT_TOKEN not configured')
+  }
+  if (!validateBotToken(botToken)) {
+    throw new Error(`TELEGRAM_BOT_TOKEN has invalid format. Expected format: 123456:ABC-DEF...`)
+  }
+  return botToken
+}
+
+/**
  * Send message to Telegram chat
  */
 export async function sendMessage(
@@ -59,10 +82,7 @@ export async function sendMessage(
     parse_mode?: 'HTML' | 'Markdown' | 'MarkdownV2'
   }
 ): Promise<Response> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN
-  if (!botToken) {
-    throw new Error('TELEGRAM_BOT_TOKEN not configured')
-  }
+  const botToken = getBotToken()
 
   const url = `https://api.telegram.org/bot${botToken}/sendMessage`
   
@@ -120,42 +140,83 @@ export async function answerCallbackQuery(
   callbackQueryId: string,
   text?: string
 ): Promise<Response> {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN
-  if (!botToken) {
-    throw new Error('TELEGRAM_BOT_TOKEN not configured')
-  }
+  const botToken = getBotToken()
 
   const url = `https://api.telegram.org/bot${botToken}/answerCallbackQuery`
   
-  return fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      callback_query_id: callbackQueryId,
-      text,
-    }),
-  })
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        callback_query_id: callbackQueryId,
+        text,
+      }),
+    })
+
+    const result = await response.json()
+    
+    if (!response.ok || !result.ok) {
+      console.error('[BOT] Failed to answer callback query:', {
+        queryId: callbackQueryId,
+        error: result.description,
+        status: response.status,
+        error_code: result.error_code,
+      })
+    } else {
+      console.log('[BOT] Callback query answered successfully:', callbackQueryId)
+    }
+    
+    return response
+  } catch (error) {
+    console.error('[BOT] Error answering callback query:', error)
+    throw error
+  }
 }
 
 /**
  * Verify webhook secret
- * TODO: Re-enable after fixing Vercel environment variables
  */
 export function verifyWebhookSecret(secret: string | null): boolean {
-  // Temporarily disabled for debugging
-  // const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
-  // if (webhookSecret && secret !== webhookSecret) {
-  //   return false
-  // }
-  return true
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET
+  
+  // Если secret не настроен, разрешаем запросы (для разработки)
+  if (!webhookSecret) {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[BOT] ⚠️ TELEGRAM_WEBHOOK_SECRET not set in production! Webhook is insecure!')
+      // В production лучше отклонить, но для совместимости разрешаем
+      // TODO: Включить строгую проверку после настройки secret
+      return true
+    }
+    // В development разрешаем без secret
+    return true
+  }
+  
+  // Проверяем secret
+  const isValid = secret === webhookSecret
+  
+  if (!isValid) {
+    console.warn('[BOT] Invalid webhook secret:', {
+      received: secret ? 'present' : 'missing',
+      expected: webhookSecret ? 'configured' : 'not configured',
+    })
+  }
+  
+  return isValid
 }
 
 /**
  * Create inline keyboard with Mini App button
  */
 export function createMiniAppKeyboard(webAppUrl: string): InlineKeyboardButton[][] {
+  // Валидация URL
+  if (!webAppUrl || !webAppUrl.startsWith('http')) {
+    console.error('[BOT] Invalid webAppUrl:', webAppUrl)
+    throw new Error(`Invalid webAppUrl: ${webAppUrl}`)
+  }
+
   return [
     [
       {
@@ -166,7 +227,7 @@ export function createMiniAppKeyboard(webAppUrl: string): InlineKeyboardButton[]
     [
       {
         text: '💬 Поддержка',
-        url: 'https://t.me/support',
+        url: 'https://t.me/outlivion_support', // Исправлен URL
       },
       {
         text: '❓ FAQ',
