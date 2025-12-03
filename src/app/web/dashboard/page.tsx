@@ -12,36 +12,71 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [balance, setBalance] = useState(0);
 
   const referralLink = user ? `https://t.me/outlivionbot?start=${user.telegramId}` : '';
 
   useEffect(() => {
     // Check auth first
-    if (!isAuthenticated()) {
-      router.push('/web/login');
+    console.log('Checking authentication...');
+    const authenticated = isAuthenticated();
+    console.log('Is authenticated:', authenticated);
+    
+    if (!authenticated) {
+      console.log('Not authenticated, redirecting to login...');
+      router.replace('/web/login');
       return;
     }
 
+    let isMounted = true;
+    const timeoutId = setTimeout(() => {
+      if (isMounted && loading) {
+        console.error('Request timeout after 10 seconds');
+        setError('Превышено время ожидания ответа от сервера');
+        setLoading(false);
+      }
+    }, 10000); // 10 second timeout
+
     async function fetchData() {
       try {
+        console.log('Fetching user data from:', process.env.NEXT_PUBLIC_API_URL);
         const [userData, subscriptionData] = await Promise.all([
           userApi.getUser(),
           userApi.getSubscription(),
         ]);
 
+        clearTimeout(timeoutId);
+
+        if (!isMounted) return;
+
+        console.log('Data fetched successfully:', { userData, subscriptionData });
         setUser(userData);
         setSubscription(subscriptionData);
         setBalance(userData.balance || 0);
+        setError(null);
       } catch (error: any) {
         console.error('Failed to fetch data:', error);
-        showToast(error.message || 'Ошибка загрузки данных', 'error');
+        clearTimeout(timeoutId);
+        
+        if (!isMounted) return;
+        
+        const errorMessage = error.message || 'Ошибка загрузки данных';
+        setError(errorMessage);
+        showToast(errorMessage, 'error');
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
 
     fetchData();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
   }, [router, showToast]);
 
   const copyReferralLink = async () => {
@@ -65,6 +100,36 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background-primary">
         <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary-main border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background-primary p-4">
+        <div className="max-w-md w-full bg-background-card rounded-2xl p-6 text-center">
+          <div className="w-16 h-16 bg-status-error/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-status-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h3 className="text-xl font-bold text-text-primary mb-2">Ошибка загрузки</h3>
+          <p className="text-text-secondary mb-6">{error}</p>
+          <div className="space-y-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full py-3 px-4 bg-primary-main text-white font-semibold rounded-xl hover:bg-primary-dark transition-all"
+            >
+              Повторить попытку
+            </button>
+            <button
+              onClick={() => router.push('/web/login')}
+              className="w-full py-3 px-4 bg-background-tertiary text-text-primary font-semibold rounded-xl hover:bg-border-light transition-all"
+            >
+              Вернуться к логину
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

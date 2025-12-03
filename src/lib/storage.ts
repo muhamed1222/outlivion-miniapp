@@ -57,6 +57,7 @@ class LocalStorageAdapter implements StorageAdapter {
     try {
       // Удаляем только auth-related items
       localStorage.removeItem('accessToken');
+      localStorage.removeItem('token'); // Legacy
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('user');
       localStorage.removeItem('telegramId');
@@ -96,6 +97,7 @@ class CookieAdapter implements StorageAdapter {
     if (typeof window === 'undefined') return;
     // Удаляем только auth-related cookies
     Cookies.remove('accessToken');
+    Cookies.remove('token'); // Legacy
     Cookies.remove('refreshToken');
     Cookies.remove('user');
     Cookies.remove('telegramId');
@@ -131,9 +133,10 @@ export const storage = getStorageAdapter();
 export const tokenStorage = {
   /**
    * Get access token
+   * Проверяем оба варианта: 'accessToken' и 'token' для обратной совместимости
    */
   getAccessToken(): string | null {
-    return storage.getItem('accessToken');
+    return storage.getItem('accessToken') || storage.getItem('token');
   },
 
   /**
@@ -176,6 +179,7 @@ export const tokenStorage = {
    */
   clearTokens(): void {
     storage.removeItem('accessToken');
+    storage.removeItem('token'); // Legacy
     storage.removeItem('refreshToken');
   },
 
@@ -184,6 +188,8 @@ export const tokenStorage = {
    */
   clearAll(): void {
     storage.clear();
+    // Also clear legacy token
+    storage.removeItem('token');
   },
 };
 
