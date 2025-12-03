@@ -8,22 +8,27 @@
     "build": "next build",
     "start": "next start -p 3002",
     "lint": "next lint",
-    "setup:webhook": "tsx scripts/setup-webhook.ts"
+    "setup:webhook": "tsx scripts/setup-webhook.ts",
+    "bot:diagnostics": "tsx scripts/bot-diagnostics.ts"
   },
   "dependencies": {
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@types/pg": "^8.15.6",
     "axios": "^1.6.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.0.0",
     "framer-motion": "^12.23.25",
     "js-cookie": "^3.0.5",
     "next": "^14.2.33",
+    "pg": "^8.16.3",
+    "pino": "^10.1.0",
     "qrcode.react": "^3.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "tailwind-merge": "^2.2.0"
+    "tailwind-merge": "^2.2.0",
+    "telegraf": "^4.16.3"
   },
   "devDependencies": {
     "@types/js-cookie": "^3.0.6",
