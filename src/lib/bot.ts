@@ -233,8 +233,13 @@ export function createMiniAppKeyboard(webAppUrl: string): InlineKeyboardButton[]
   // Валидация URL
   if (!webAppUrl || !webAppUrl.startsWith('http')) {
     console.error('[BOT] Invalid webAppUrl:', webAppUrl)
-    throw new Error(`Invalid webAppUrl: ${webAppUrl}`)
+    // Используем дефолтный URL вместо выброса ошибки
+    webAppUrl = 'https://app.outlivion.space/telegram'
+    console.warn('[BOT] Using default webAppUrl:', webAppUrl)
   }
+
+  // Убираем trailing slash если есть
+  webAppUrl = webAppUrl.replace(/\/$/, '')
 
   return [
     [
@@ -246,7 +251,7 @@ export function createMiniAppKeyboard(webAppUrl: string): InlineKeyboardButton[]
     [
       {
         text: '💬 Поддержка',
-        url: 'https://t.me/outlivion_support', // Исправлен URL
+        url: 'https://t.me/outlivion_support',
       },
       {
         text: '❓ FAQ',

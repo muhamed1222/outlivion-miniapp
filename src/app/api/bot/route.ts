@@ -252,33 +252,40 @@ async function handleCallbackQuery(update: TelegramUpdate) {
  * Handle /start command
  */
 async function handleStartCommand(chatId: number, firstName: string) {
-  const miniAppUrl = process.env.NEXT_PUBLIC_MINIAPP_URL || 'http://localhost:3002'
+  // Определяем URL для Mini App
+  // Используем NEXT_PUBLIC_MINIAPP_URL или дефолтный production URL
+  let miniAppUrl = process.env.NEXT_PUBLIC_MINIAPP_URL || 'https://app.outlivion.space'
   
-  console.log('[BOT] handleStartCommand:', { chatId, firstName, miniAppUrl })
+  // Убеждаемся что URL правильный (должен быть полный URL с протоколом)
+  if (!miniAppUrl.startsWith('http')) {
+    console.warn('[BOT] Invalid NEXT_PUBLIC_MINIAPP_URL, using default:', miniAppUrl)
+    miniAppUrl = 'https://app.outlivion.space'
+  }
+  
+  // Убираем trailing slash если есть
+  miniAppUrl = miniAppUrl.replace(/\/$/, '')
+  
+  // Добавляем путь /telegram для Mini App
+  const webAppUrl = `${miniAppUrl}/telegram`
+  
+  console.log('[BOT] handleStartCommand:', { chatId, firstName, miniAppUrl, webAppUrl })
   
   try {
-    // Сначала отправляем простое сообщение для теста
     console.log('[BOT] Attempting to send welcome message...')
     
-    const welcomeText = `👋 Привет, ${firstName}!
-
-Добро пожаловать в Outlivion VPN — ваш надежный и быстрый VPN сервис.
-
-🔐 Что мы предлагаем:
-• Высокая скорость подключения
-• Серверы по всему миру
-• Военное шифрование AES-256
-• Полная анонимность, без логов
-
-Нажмите кнопку ниже, чтобы начать! 👇`
-
-    const keyboard = createMiniAppKeyboard(miniAppUrl)
+    // Используем функцию getWelcomeMessage для консистентности
+    const welcomeText = getWelcomeMessage(firstName)
+    
+    // Создаём клавиатуру с правильным URL
+    const keyboard = createMiniAppKeyboard(webAppUrl)
     console.log('[BOT] Keyboard created:', JSON.stringify(keyboard, null, 2))
     
+    // Отправляем сообщение с Markdown форматированием и клавиатурой
     const result = await sendMessage(
       chatId,
       welcomeText,
       {
+        parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: keyboard,
         },
