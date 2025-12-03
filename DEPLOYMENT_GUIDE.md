@@ -18,7 +18,7 @@
 ## 🗂️ Architecture Overview
 
 ```
-Frontend (Vercel):     bot.outlivion.space
+Frontend (Vercel):     app.outlivion.space
   ├─> /telegram        → Telegram Mini App
   └─> /web             → Web Portal
 
@@ -200,11 +200,11 @@ vercel --prod
 
 ### STEP 5: Configure Custom Domains (5 min)
 
-#### Frontend Domain: bot.outlivion.space
+#### Frontend Domain: app.outlivion.space
 
 **In Vercel:**
 1. Project Settings → Domains
-2. Add Domain: `bot.outlivion.space`
+2. Add Domain: `app.outlivion.space`
 3. Follow DNS instructions
 
 **In your DNS provider (Cloudflare/Namecheap/etc):**
@@ -237,10 +237,10 @@ Open @BotFather in Telegram:
 1. /mybots
 2. Select @outlivionbot
 3. Edit Bot → Bot Settings → Domain
-   Add: bot.outlivion.space
+   Add: app.outlivion.space
 
 4. Menu Button → Edit Menu Button URL
-   URL: https://bot.outlivion.space/telegram
+   URL: https://app.outlivion.space/telegram
 
 5. Bot Description:
    "Outlivion VPN - Быстрый и безопасный VPN сервис.
@@ -268,15 +268,15 @@ curl https://api.outlivion.space/billing/tariffs
 
 #### Frontend Tests:
 
-1. **Open in browser:** https://bot.outlivion.space
+1. **Open in browser:** https://app.outlivion.space
    - Should redirect to /web or /telegram
 
-2. **Web Portal:** https://bot.outlivion.space/web
+2. **Web Portal:** https://app.outlivion.space/web
    - Should show login page
 
 3. **Mini App:** Open Telegram bot
    - Click "Open Mini App" button
-   - Should open https://bot.outlivion.space/telegram
+   - Should open https://app.outlivion.space/telegram
 
 #### Integration Test:
 
@@ -367,7 +367,7 @@ If all checks pass, **you're live!** 🚀
 
 Share your app:
 - Bot: https://t.me/outlivionbot
-- Web: https://bot.outlivion.space
+- Web: https://app.outlivion.space
 
 ---
 

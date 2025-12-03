@@ -53,7 +53,7 @@
 ### ✅ LIVE URLs:
 
 **Frontend (Vercel):**
-- 🌐 **https://bot.outlivion.space**
+- 🌐 **https://app.outlivion.space**
   - `/` → Auto-redirect ✅
   - `/web` → Web Portal ✅
   - `/telegram` → Mini App ✅
@@ -84,7 +84,7 @@
 ### Production:
 ```
 🌐 Frontend:               ✅ LIVE (Vercel)
-   ├─ Domain:             bot.outlivion.space
+   ├─ Domain:             app.outlivion.space
    ├─ SSL:                ✅ Active
    ├─ Routes:             21/21 working
    └─ Build:              SUCCESS
@@ -96,7 +96,7 @@
 
 🤖 Telegram:               ✅ Configured
    ├─ Bot:                @outlivionbot
-   ├─ Webhook:            bot.outlivion.space/api/bot
+   ├─ Webhook:            app.outlivion.space/api/bot
    └─ Domain:             Approved in BotFather
 ```
 
@@ -281,7 +281,7 @@ TOTAL:                ~$10-34/month
 
 ### Web Portal:
 ```
-https://bot.outlivion.space/web
+https://app.outlivion.space/web
 ```
 
 ### Telegram Mini App:
@@ -330,7 +330,7 @@ railway up
 - ✅ Протестировали интеграцию
 - ✅ **РАЗВЕРНУЛИ В PRODUCTION!**
 
-**Frontend LIVE:** https://bot.outlivion.space ✨
+**Frontend LIVE:** https://app.outlivion.space ✨
 
 **Backend:** Ready to deploy в 10 минут
 
@@ -372,7 +372,7 @@ curl https://api.outlivion.space/health
 
 ## 🎁 Bonus: Quick Links
 
-- 🌐 **App:** https://bot.outlivion.space
+- 🌐 **App:** https://app.outlivion.space
 - 🤖 **Bot:** https://t.me/outlivionbot
 - 📚 **Docs:** See all `*.md` files in project
 - 🚀 **Deploy:** Follow `DEPLOYMENT_GUIDE.md`

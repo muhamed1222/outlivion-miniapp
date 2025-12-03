@@ -7,7 +7,7 @@
 
 ## ✅ ЧТО УЖЕ СДЕЛАНО:
 
-- ✅ **Frontend DEPLOYED:** https://bot.outlivion.space
+- ✅ **Frontend DEPLOYED:** https://app.outlivion.space
 - ✅ **Railway CLI:** Установлен
 - ✅ **Backend code:** Готов к deploy
 - ✅ **PostgreSQL:** Running locally
@@ -126,7 +126,7 @@ curl https://your-app.up.railway.app/billing/tariffs
 ### Test Frontend:
 ```bash
 # Open in browser
-open https://bot.outlivion.space
+open https://app.outlivion.space
 
 # Check console (should make API calls to new backend)
 ```
@@ -172,7 +172,7 @@ railway run npm run db:migrate
 ## 🎯 Current Status
 
 ```
-Frontend:     ✅ DEPLOYED (bot.outlivion.space)
+Frontend:     ✅ DEPLOYED (app.outlivion.space)
 Backend:      ⏳ Ready to deploy (10 min)
 Database:     ⏳ Ready to migrate (5 min)
 Integration:  ⏳ 15 min total
@@ -211,7 +211,7 @@ Frontend уже работает в production! 🎉
 ✅ Status: LIVE! 🚀
 ```
 
-**FRONTEND LIVE:** https://bot.outlivion.space ✨
+**FRONTEND LIVE:** https://app.outlivion.space ✨
 
 **Следующий шаг (optional):**
 ```

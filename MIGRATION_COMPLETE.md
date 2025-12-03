@@ -235,7 +235,7 @@ vercel --prod
 **4. Domains (5 min):**
 ```
 api.outlivion.space → Railway
-bot.outlivion.space → Vercel
+app.outlivion.space → Vercel
 ```
 
 **Полная инструкция:** См. `DEPLOYMENT_GUIDE.md`
@@ -319,7 +319,7 @@ TOTAL:                $34-54/month
 - **Web:** http://localhost:3002/web
 
 ### Production URLs (After deployment):
-- **Frontend:** https://bot.outlivion.space
+- **Frontend:** https://app.outlivion.space
 - **Backend:** https://api.outlivion.space
 - **Telegram Bot:** https://t.me/outlivionbot
 

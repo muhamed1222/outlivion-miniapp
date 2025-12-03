@@ -26,7 +26,7 @@
 │                                                         │
 │  Users                                                  │
 │    │                                                    │
-│    ├──> bot.outlivion.space (Vercel)                   │
+│    ├──> app.outlivion.space (Vercel)                   │
 │    │      └─> Telegram Mini App + Web Portal          │
 │    │          ├─> /telegram/*                          │
 │    │          └─> /web/*                               │
@@ -243,7 +243,7 @@ api.outlivion.space → Railway/Fly.io deployment
 
 **Frontend:**
 ```
-bot.outlivion.space → Vercel deployment
+app.outlivion.space → Vercel deployment
 ```
 
 #### DNS Configuration (Cloudflare/Domain Provider):
@@ -251,7 +251,7 @@ bot.outlivion.space → Vercel deployment
 ```
 # A Records or CNAME
 api.outlivion.space   CNAME  your-app.up.railway.app
-bot.outlivion.space   CNAME  cname.vercel-dns.com
+app.outlivion.space   CNAME  cname.vercel-dns.com
 
 # Or if using Railway custom domain:
 1. Railway dashboard → Settings → Domains
@@ -260,7 +260,7 @@ bot.outlivion.space   CNAME  cname.vercel-dns.com
 
 # Vercel custom domain:
 1. Vercel dashboard → Settings → Domains
-2. Add: bot.outlivion.space
+2. Add: app.outlivion.space
 3. Configure DNS as instructed
 ```
 
@@ -290,10 +290,10 @@ railway run npm run db:seed
 1. Open @BotFather in Telegram
 2. /mybots → Select your bot
 3. Bot Settings → Domain
-4. Add: bot.outlivion.space
+4. Add: app.outlivion.space
 
 5. Menu Button → Web App
-6. URL: https://bot.outlivion.space/telegram
+6. URL: https://app.outlivion.space/telegram
 
 7. Bot Description:
    "Outlivion VPN - Быстрый и безопасный VPN сервис"
@@ -309,10 +309,10 @@ railway run npm run db:seed
 - [ ] `POST https://api.outlivion.space/auth/telegram`
 
 #### Frontend:
-- [ ] `https://bot.outlivion.space/` (auto-redirect)
-- [ ] `https://bot.outlivion.space/telegram` (Mini App)
-- [ ] `https://bot.outlivion.space/web` (Web Portal)
-- [ ] `https://bot.outlivion.space/web/login`
+- [ ] `https://app.outlivion.space/` (auto-redirect)
+- [ ] `https://app.outlivion.space/telegram` (Mini App)
+- [ ] `https://app.outlivion.space/web` (Web Portal)
+- [ ] `https://app.outlivion.space/web/login`
 
 #### Integration:
 - [ ] Open Mini App from Telegram bot

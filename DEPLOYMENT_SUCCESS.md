@@ -10,7 +10,7 @@
 ### ✅ Все работает!
 
 ```
-🌐 Frontend:  https://bot.outlivion.space
+🌐 Frontend:  https://app.outlivion.space
    ├─> /          ✅ Auto-redirect
    ├─> /telegram  ✅ Mini App
    └─> /web       ✅ Web Portal
@@ -25,15 +25,15 @@
 
 ### Frontend (Vercel): ✅ DEPLOYED
 
-**URL:** https://bot.outlivion.space  
+**URL:** https://app.outlivion.space  
 **Status:** ✅ READY  
 **Build:** SUCCESS  
 **Routes:** 21 working
 
 **Verified:**
-- ✅ `https://bot.outlivion.space/` → Auto-redirect works
-- ✅ `https://bot.outlivion.space/web` → Web Portal loads  
-- ✅ `https://bot.outlivion.space/telegram` → Mini App loads
+- ✅ `https://app.outlivion.space/` → Auto-redirect works
+- ✅ `https://app.outlivion.space/web` → Web Portal loads  
+- ✅ `https://app.outlivion.space/telegram` → Mini App loads
 - ✅ Header + Footer → Rendering correctly
 - ✅ Security headers → Applied
 - ✅ SSL → Active (HTTPS)
@@ -61,7 +61,7 @@
 
 ### Frontend Production:
 ```
-✅ Domain: bot.outlivion.space
+✅ Domain: app.outlivion.space
 ✅ SSL: Active
 ✅ Pages: 21 routes deployed
 ✅ Build: No errors
@@ -151,7 +151,7 @@ TELEGRAM_BOT_TOKEN=8477147639:AAEVS_D_A4avYXPOku78AWiYbiirOgglpbw
 ```
 1. Open https://t.me/outlivionbot
 2. Click "Open Mini App"
-3. Should open https://bot.outlivion.space/telegram
+3. Should open https://app.outlivion.space/telegram
 4. Auto-login should work
 5. API calls to production backend
 ```
@@ -204,7 +204,7 @@ Deployment:
   💾 Database:          ⏳ Ready (Neon)
   
 URLs:
-  Frontend:             https://bot.outlivion.space
+  Frontend:             https://app.outlivion.space
   Bot:                  https://t.me/outlivionbot
   API (future):         https://api.outlivion.space
 
@@ -223,9 +223,9 @@ PROGRESS: ████████████████████ 100% ✅
 ## 💡 What's Working Now
 
 ### Live in Production:
-1. ✅ **https://bot.outlivion.space** - Main app
-2. ✅ **https://bot.outlivion.space/web** - Web Portal
-3. ✅ **https://bot.outlivion.space/telegram** - Mini App
+1. ✅ **https://app.outlivion.space** - Main app
+2. ✅ **https://app.outlivion.space/web** - Web Portal
+3. ✅ **https://app.outlivion.space/telegram** - Mini App
 4. ✅ **Auto-redirect** - Environment detection
 5. ✅ **All 21 routes** - Deployed & working
 6. ✅ **Security** - Headers applied
@@ -252,7 +252,7 @@ PROGRESS: ████████████████████ 100% ✅
 - ✅ Tested thoroughly
 - ✅ **DEPLOYED TO PRODUCTION!**
 
-**Frontend is LIVE:** https://bot.outlivion.space 🌐
+**Frontend is LIVE:** https://app.outlivion.space 🌐
 
 ---
 
