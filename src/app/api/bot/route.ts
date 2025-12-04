@@ -167,6 +167,50 @@ async function handleMessage(update: TelegramUpdate) {
 
   if (!text) return
 
+  // ПРИОРИТЕТ: Проверяем pending login session ПЕРЕД обработкой команд
+  // (кроме случая когда это /start с токеном)
+  const telegramId = String(message.from.id);
+  const isStartWithToken = text.startsWith('/start login_');
+  
+  if (!isStartWithToken) {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const sessionCheck = await axios.get(
+        `${API_URL}/auth/bot/pending-session?telegramId=${telegramId}`,
+        { timeout: 5000 }
+      );
+      
+      if (sessionCheck.data.hasPendingSession) {
+        const token = sessionCheck.data.token;
+        console.log('[BOT] Found pending login session, showing confirmation:', { telegramId, token, command: text });
+        
+        await sendMessage(chatId, '🔐 **Подтверждение входа в Outlivion Web Portal**\n\nВы пытаетесь войти через браузер.\nПодтвердите вход нажав кнопку ниже:', {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '✅ Подтвердить вход',
+                  callback_data: `confirm_login_${token}`,
+                },
+              ],
+              [
+                {
+                  text: '❌ Отменить',
+                  callback_data: 'cancel_login',
+                },
+              ],
+            ],
+          },
+        });
+        return; // Не обрабатываем дальше
+      }
+    } catch (error) {
+      console.warn('[BOT] Could not check pending session:', error);
+      // Продолжаем с обычной обработкой
+    }
+  }
+
   // Handle commands
   if (text.startsWith('/start')) {
     // Check if this is a deep-link login command
@@ -183,6 +227,9 @@ async function handleMessage(update: TelegramUpdate) {
     await handleHelpCommand(chatId)
   } else if (text.startsWith('/status')) {
     await handleStatusCommand(chatId, message.from.id)
+  } else {
+    // Обычный ответ на неизвестное сообщение
+    await sendMessage(chatId, 'Используйте /help для списка команд');
   }
 }
 
