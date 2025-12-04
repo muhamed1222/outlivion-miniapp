@@ -1,0 +1,11 @@
+This file is for debugging Vercel deployment issues.
+Created at: 2025-12-04T22:30:00Z
+
+Files that should exist:
+- src/components/ui/loading.tsx
+- src/components/ui/button.tsx
+- src/components/ui/card.tsx
+- src/lib/utils/environment.ts
+
+If you see this file but not those files, there's a problem with Vercel's file syncing.
+

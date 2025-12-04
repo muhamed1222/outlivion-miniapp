@@ -7,6 +7,9 @@
   "env": {
     "NEXT_PUBLIC_API_URL": "https://api.outlivion.space",
     "NEXT_PUBLIC_TELEGRAM_BOT_NAME": "outlivionbot"
+  },
+  "github": {
+    "silent": false
   }
 }
 
