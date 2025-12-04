@@ -32,7 +32,7 @@ const webPublicRoutes = [
  * Checks both cookies (web) and could check headers for telegram
  */
 function checkAuthentication(request: NextRequest): boolean {
-  // Проверяем accessToken в cookies (для web и telegram)
+  // Проверяем accessToken в cookies (для web)
   const accessToken = request.cookies.get('accessToken')?.value;
   if (accessToken) return true;
 
@@ -41,8 +41,15 @@ function checkAuthentication(request: NextRequest): boolean {
   if (oldToken) return true;
 
   // Note: localStorage tokens не доступны в middleware
-  // Для telegram проверка будет в компонентах
+  // Для telegram проверка будет в компонентах через TelegramProvider
   return false;
+}
+
+/**
+ * Check if route is Telegram Mini App route
+ */
+function isTelegramRoute(pathname: string): boolean {
+  return pathname.startsWith('/telegram');
 }
 
 /**
@@ -61,18 +68,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Проверяем авторизацию
-  const isAuthenticated = checkAuthentication(request);
-
-  // Проверка защищенных Telegram роутов
-  const isTelegramProtected = telegramProtectedRoutes.some(route =>
-    pathname.startsWith(route)
-  );
-
-  if (isTelegramProtected && !isAuthenticated) {
-    // Редирект на telegram login (автоматическая авторизация)
-    return NextResponse.redirect(new URL('/telegram/login', request.url));
+  // Для Telegram routes пропускаем middleware проверку
+  // Авторизация будет происходить в TelegramProvider через localStorage
+  if (isTelegramRoute(pathname)) {
+    const response = NextResponse.next();
+    // Добавляем security headers
+    response.headers.set('X-Frame-Options', 'DENY');
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    return response;
   }
+
+  // Проверяем авторизацию только для Web routes
+  const isAuthenticated = checkAuthentication(request);
 
   // Проверка защищенных Web роутов
   const isWebProtected = webProtectedRoutes.some(route =>

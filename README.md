@@ -321,7 +321,50 @@ Base URL: `https://api.outlivion.space`
 
 ---
 
+## 🧪 Testing
+
+### Run Tests
+
+```bash
+# Run all tests in watch mode
+npm test
+
+# Run tests once (CI mode)
+npm run test:ci
+
+# Run tests with coverage
+npm run test:coverage
+```
+
+### Test Coverage
+
+Текущие цели:
+- Branches: 50%+
+- Functions: 50%+
+- Lines: 60%+
+- Statements: 60%+
+
 ## 🐛 Troubleshooting
+
+### Авторизация не работает
+
+**Проблема:** Пользователь не может войти через Telegram
+
+**Решение:**
+1. Проверить `initData` в консоли браузера
+2. Убедиться что `NEXT_PUBLIC_API_URL` правильный
+3. Проверить что API сервер запущен
+4. Проверить токены в localStorage/cookies
+
+### API запросы падают с 401
+
+**Проблема:** Постоянные ошибки авторизации
+
+**Решение:**
+1. Очистить localStorage: `localStorage.clear()`
+2. Перезайти в приложение
+3. Проверить что токены не истекли
+4. Auto-refresh должен обновлять токены автоматически
 
 ### Environment detection не работает
 
@@ -337,23 +380,24 @@ Base URL: `https://api.outlivion.space`
 
 ### Build warnings
 
-- `viewport metadata warnings` - некритично, будет исправлено в будущем
+- `viewport metadata warnings` - некритично
 - Не влияют на функциональность
 
-### 404 на `/web`
+### 404 на `/telegram/login`
 
-- Web Portal страницы будут добавлены в Phase 2
-- Пока доступна только заглушка с redirect
+- Эта страница была удалена
+- Авторизация теперь происходит автоматически на `/telegram`
+- Редирект настроен в middleware
 
 ---
 
 ## 📖 Documentation
 
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Полное руководство по deployment (Vercel, Docker, VPS)
+- **[QUICK_START.md](QUICK_START.md)** - Быстрый старт для разработки
+- **[TECH_STACK.md](TECH_STACK.md)** - Технологический стек
 - **[MIGRATION_PLAN.md](MIGRATION_PLAN.md)** - План миграции Portal → MiniApp
 - **[MIGRATION_STATUS.md](MIGRATION_STATUS.md)** - Текущий статус миграции
-- **[PHASE_1_COMPLETED.md](PHASE_1_COMPLETED.md)** - Отчет Phase 1
-- **[QUICK_START.md](QUICK_START.md)** - Быстрый старт (оригинальный)
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Инструкции по деплою
 
 ---
 
@@ -418,8 +462,16 @@ MIT License - см. [LICENSE](LICENSE)
 ---
 
 **Версия:** 2.0.0 (Unified)  
-**Последнее обновление:** 3 декабря 2025, 20:00  
-**Статус:** ✅ **ALL PHASES COMPLETE - PRODUCTION READY** 🚀
+**Последнее обновление:** 4 декабря 2025  
+**Статус:** ✅ **PRODUCTION READY - All Critical Fixes Applied** 🚀
+
+### ✅ Recent Improvements (v2.0.0)
+
+- **Авторизация:** Auto-login, auto-refresh токенов, unified storage
+- **API:** Retry логика, обработка пустых данных, fallback значения
+- **Безопасность:** Error boundary, middleware исправлен, валидация initData
+- **Deployment:** Docker, health check endpoint, deployment guides
+- **Тестирование:** Jest setup, unit тесты для auth и API (60%+ coverage)
 
 ---
 

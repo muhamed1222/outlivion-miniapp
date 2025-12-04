@@ -1,529 +1,467 @@
-# Outlivion MiniApp - Deployment Guide
+# 🚀 Deployment Guide - Outlivion Mini App
 
-Руководство по развертыванию Telegram MiniApp в production.
+Полное руководство по развертыванию Outlivion Mini App на различных платформах.
 
-## 📋 Pre-Deployment Checklist
+---
 
-- [ ] Backend API готов и поддерживает `/miniapp/*` endpoints
-- [ ] Telegram Bot создан и настроен
-- [ ] Environment variables настроены
-- [ ] HTTPS сертификат готов (обязательно для Telegram)
-- [ ] Домен настроен
-- [ ] База данных готова
+## 📋 Предварительные требования
 
-## 🔐 Environment Variables
+### Обязательно
+- Node.js 20+
+- npm или pnpm
+- Telegram Bot Token
+- Доступ к Outlivion API
 
-### Production Environment
+### Опционально
+- Docker (для контейнеризации)
+- Vercel аккаунт (для автоматического деплоя)
+- Domain (для production)
 
-```env
-NEXT_PUBLIC_API_URL=https://api.yourdomain.com
-NEXT_PUBLIC_TELEGRAM_BOT_NAME=your_bot_name
-NODE_ENV=production
-```
+---
 
-### Security Considerations
+## 🌐 Vercel Deployment (Рекомендуется)
 
-- ❌ НЕ храните Bot Token в MiniApp
-- ✅ Bot Token должен быть только на backend
-- ✅ Используйте HTTPS для всех запросов
-- ✅ Настройте CORS на backend
-
-## 🚀 Deployment Options
-
-### Option 1: Vercel (Рекомендуется)
-
-#### Step 1: Подготовка
+### Шаг 1: Подготовка
 
 ```bash
-# Установите Vercel CLI
+# Установить Vercel CLI
 npm i -g vercel
 
-# Войдите в аккаунт
+# Войти в аккаунт
 vercel login
 ```
 
-#### Step 2: Настройка проекта
+### Шаг 2: Конфигурация
 
-```bash
-cd apps/miniapp
-vercel
+Создайте `.env.production`:
+
+```env
+NEXT_PUBLIC_API_URL=https://api.outlivion.space
+NEXT_PUBLIC_TELEGRAM_BOT_NAME=outlivionbot
+NEXT_PUBLIC_MINIAPP_URL=https://app.outlivion.space
+NEXT_PUBLIC_APP_VERSION=2.0.0
+
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_WEBHOOK_SECRET=your_webhook_secret_32_chars
 ```
 
-#### Step 3: Настройка Environment Variables
-
-В Vercel Dashboard:
-1. Settings → Environment Variables
-2. Добавьте:
-   - `NEXT_PUBLIC_API_URL`
-   - `NEXT_PUBLIC_TELEGRAM_BOT_NAME`
-
-#### Step 4: Deploy
+### Шаг 3: Deploy
 
 ```bash
+# Development preview
+vercel
+
+# Production
 vercel --prod
 ```
 
-#### Step 5: Custom Domain (Optional)
+### Шаг 4: Environment Variables в Vercel Dashboard
 
-В Vercel Dashboard:
+1. Откройте https://vercel.com/dashboard
+2. Выберите проект
+3. Settings → Environment Variables
+4. Добавьте все переменные из `.env.production`
+5. Redeploy проект
+
+### Шаг 5: Domain Setup
+
 1. Settings → Domains
-2. Добавьте ваш домен
-3. Настройте DNS записи
+2. Добавьте `app.outlivion.space`
+3. Настройте DNS записи:
+   ```
+   A     app.outlivion.space  →  76.76.21.21
+   CNAME www                  →  cname.vercel-dns.com
+   ```
 
-#### Vercel Configuration
-
-`vercel.json`:
-```json
-{
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "framework": "nextjs",
-  "regions": ["fra1"]
-}
-```
-
-### Option 2: Docker + VPS
-
-#### Step 1: Build Docker Image
+### Шаг 6: Настройка Telegram Bot
 
 ```bash
-cd apps/miniapp
+# Установить webhook
+npm run setup:webhook
+
+# Проверить статус
+npm run bot:diagnostics
+```
+
+---
+
+## 🐳 Docker Deployment
+
+### Шаг 1: Build Image
+
+```bash
+# Build
 docker build -t outlivion-miniapp:latest .
+
+# Tag for registry
+docker tag outlivion-miniapp:latest registry.outlivion.space/miniapp:latest
 ```
 
-#### Step 2: Push to Registry (Optional)
+### Шаг 2: Run Container
 
 ```bash
-# Docker Hub
-docker tag outlivion-miniapp:latest username/outlivion-miniapp:latest
-docker push username/outlivion-miniapp:latest
-
-# или GitHub Container Registry
-docker tag outlivion-miniapp:latest ghcr.io/username/outlivion-miniapp:latest
-docker push ghcr.io/username/outlivion-miniapp:latest
-```
-
-#### Step 3: Deploy on VPS
-
-```bash
-# На сервере
-docker pull username/outlivion-miniapp:latest
-
 docker run -d \
   --name outlivion-miniapp \
-  --restart unless-stopped \
   -p 3002:3002 \
-  -e NEXT_PUBLIC_API_URL=https://api.yourdomain.com \
-  -e NODE_ENV=production \
-  username/outlivion-miniapp:latest
+  -e NEXT_PUBLIC_API_URL=https://api.outlivion.space \
+  -e TELEGRAM_BOT_TOKEN=your_token \
+  --restart unless-stopped \
+  outlivion-miniapp:latest
 ```
 
-#### Step 4: Nginx Reverse Proxy
+### Шаг 3: Используя Docker Compose
 
-`/etc/nginx/sites-available/miniapp`:
+```bash
+# Создать .env файл
+cp env.example .env
+# Отредактировать .env с production значениями
+
+# Start
+docker-compose up -d
+
+# Logs
+docker-compose logs -f miniapp
+
+# Stop
+docker-compose down
+```
+
+### Шаг 4: Health Check
+
+```bash
+# Check container health
+docker ps
+
+# Check API
+curl http://localhost:3002/api/health
+```
+
+---
+
+## 🔧 Manual Deployment (VPS/Server)
+
+### Шаг 1: Server Setup
+
+```bash
+# SSH в сервер
+ssh user@server.outlivion.space
+
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# Install PM2
+sudo npm install -g pm2
+```
+
+### Шаг 2: Deploy Application
+
+```bash
+# Clone repository
+git clone https://github.com/outlivion/outlivion-miniapp.git
+cd outlivion-miniapp
+
+# Install dependencies
+npm ci --only=production
+
+# Build
+npm run build
+
+# Setup environment
+cp env.example .env
+nano .env  # Edit with production values
+```
+
+### Шаг 3: PM2 Configuration
+
+Создайте `ecosystem.config.js`:
+
+```javascript
+module.exports = {
+  apps: [{
+    name: 'outlivion-miniapp',
+    script: 'npm',
+    args: 'start',
+    instances: 2,
+    exec_mode: 'cluster',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3002,
+    },
+    error_file: './logs/err.log',
+    out_file: './logs/out.log',
+    log_file: './logs/combined.log',
+    time: true,
+  }],
+};
+```
+
+```bash
+# Start with PM2
+pm2 start ecosystem.config.js
+
+# Save PM2 config
+pm2 save
+
+# Setup PM2 startup
+pm2 startup
+# Follow instructions
+```
+
+### Шаг 4: Nginx Reverse Proxy
+
 ```nginx
+# /etc/nginx/sites-available/miniapp
 server {
     listen 80;
-    server_name miniapp.yourdomain.com;
-    
-    # Redirect to HTTPS
-    return 301 https://$server_name$request_uri;
-}
+    server_name app.outlivion.space;
 
-server {
-    listen 443 ssl http2;
-    server_name miniapp.yourdomain.com;
-    
-    # SSL Configuration
-    ssl_certificate /etc/letsencrypt/live/miniapp.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/miniapp.yourdomain.com/privkey.pem;
-    
-    # Security Headers
-    add_header X-Frame-Options "ALLOW-FROM https://web.telegram.org" always;
-    add_header Content-Security-Policy "frame-ancestors 'self' https://web.telegram.org https://telegram.org" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    
-    # Proxy to Next.js
     location / {
         proxy_pass http://localhost:3002;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-    
-    # Cache static files
-    location /_next/static {
-        proxy_cache STATIC;
-        proxy_pass http://localhost:3002;
-        add_header Cache-Control "public, max-age=31536000, immutable";
     }
 }
 ```
 
-Включите конфигурацию:
 ```bash
+# Enable site
 sudo ln -s /etc/nginx/sites-available/miniapp /etc/nginx/sites-enabled/
+
+# Test config
 sudo nginx -t
+
+# Reload
 sudo systemctl reload nginx
+
+# Setup SSL with Certbot
+sudo certbot --nginx -d app.outlivion.space
 ```
 
-### Option 3: Docker Compose
+---
 
-`docker-compose.prod.yml`:
-```yaml
-version: '3.8'
+## ✅ Post-Deployment Checklist
 
-services:
-  miniapp:
-    build:
-      context: ./apps/miniapp
-      dockerfile: Dockerfile
-    container_name: outlivion-miniapp
-    restart: unless-stopped
-    ports:
-      - "3002:3002"
-    environment:
-      - NEXT_PUBLIC_API_URL=https://api.yourdomain.com
-      - NODE_ENV=production
-    networks:
-      - outlivion-network
-    depends_on:
-      - backend
+### Vercel
+- [ ] Environment variables configured
+- [ ] Domain connected and SSL active
+- [ ] Webhook configured in Telegram
+- [ ] Health check endpoint working (`/api/health`)
+- [ ] Test Telegram Mini App opening
+- [ ] Check logs in Vercel dashboard
 
-  backend:
-    # ... backend configuration
+### Docker
+- [ ] Container running and healthy
+- [ ] Logs are being generated
+- [ ] Health check passing
+- [ ] Restart policy configured
+- [ ] Volumes mounted correctly (if any)
 
-networks:
-  outlivion-network:
-    driver: bridge
-```
+### Manual/VPS
+- [ ] PM2 running and monitoring
+- [ ] Nginx reverse proxy working
+- [ ] SSL certificate installed
+- [ ] Firewall configured (allow 80, 443, 22)
+- [ ] Logs rotation configured
+- [ ] Monitoring setup (optional: Prometheus, Grafana)
+- [ ] Backups configured
 
-Deploy:
+---
+
+## 🔍 Troubleshooting
+
+### Issue: Telegram Mini App not opening
+
+**Check:**
 ```bash
-docker-compose -f docker-compose.prod.yml up -d
+# Verify webhook
+curl https://api.telegram.org/bot<TOKEN>/getWebhookInfo
+
+# Expected response:
+{
+  "url": "https://app.outlivion.space/api/bot",
+  "has_custom_certificate": false,
+  "pending_update_count": 0
+}
 ```
 
-## 🔧 SSL/TLS Setup
-
-### Let's Encrypt with Certbot
-
+**Fix:**
 ```bash
-# Установка certbot
-sudo apt install certbot python3-certbot-nginx
-
-# Получение сертификата
-sudo certbot --nginx -d miniapp.yourdomain.com
-
-# Автообновление
-sudo certbot renew --dry-run
+npm run setup:webhook
 ```
 
-## 🤖 Telegram Bot Configuration
+### Issue: API connection errors
 
-### Step 1: Set Web App URL
-
+**Check:**
 ```bash
-# В @BotFather
-/setmenubutton
-[выберите вашего бота]
+# Test API connectivity
+curl https://api.outlivion.space/health
 
-# Введите:
-Button text: Открыть VPN 🚀
-Web App URL: https://miniapp.yourdomain.com
+# Check from app
+curl https://app.outlivion.space/api/health
 ```
 
-### Step 2: Set Domain
+**Fix:**
+- Verify `NEXT_PUBLIC_API_URL` is correct
+- Check CORS settings in API
+- Verify API is running
 
+### Issue: Build errors
+
+**Check:**
 ```bash
-/setdomain
-[выберите вашего бота]
-Domain: miniapp.yourdomain.com
+# Clear cache
+rm -rf .next node_modules
+npm install
+npm run build
 ```
 
-### Step 3: Configure Commands (Optional)
+**Common causes:**
+- Missing environment variables
+- TypeScript errors
+- Dependency conflicts
 
+### Issue: Memory issues (VPS)
+
+**Fix:**
 ```bash
-/setcommands
-[выберите вашего бота]
+# Increase Node memory
+NODE_OPTIONS="--max-old-space-size=2048" npm run build
 
-# Команды:
-start - Запустить VPN
-help - Помощь
-support - Поддержка
+# Reduce PM2 instances
+pm2 scale outlivion-miniapp 1
 ```
 
-### Step 4: Bot Description
-
-```bash
-/setdescription
-[выберите вашего бота]
-
-# Описание:
-Быстрый и безопасный VPN сервис. 
-Подключайтесь за 1 минуту! 🚀
-```
+---
 
 ## 📊 Monitoring
 
 ### Health Check Endpoint
 
-Создайте endpoint для проверки здоровья:
+```bash
+# Check application health
+curl https://app.outlivion.space/api/health
 
-`src/app/api/health/route.ts`:
-```typescript
-export async function GET() {
-  return Response.json({ 
-    status: 'ok',
-    timestamp: new Date().toISOString()
-  });
+# Expected response:
+{
+  "status": "ok",
+  "timestamp": "2025-12-04T...",
+  "version": "2.0.0",
+  "uptime": 12345,
+  "environment": "production",
+  "services": {
+    "api": {
+      "status": "ok",
+      "url": "https://api.outlivion.space"
+    },
+    "telegram": {
+      "status": "ok",
+      "botName": "outlivionbot",
+      "hasToken": true
+    }
+  }
 }
 ```
-
-### Uptime Monitoring
-
-Используйте сервисы:
-- UptimeRobot
-- Pingdom
-- StatusCake
-
-Настройте мониторинг на:
-- `https://miniapp.yourdomain.com/api/health`
-- Интервал: 5 минут
 
 ### Logs
 
-#### Vercel
-
+**Vercel:**
 ```bash
-vercel logs
 vercel logs --follow
 ```
 
-#### Docker
-
+**Docker:**
 ```bash
-docker logs outlivion-miniapp
-docker logs -f outlivion-miniapp --tail 100
+docker logs -f outlivion-miniapp
 ```
 
-## 🔄 CI/CD
-
-### GitHub Actions
-
-`.github/workflows/deploy-miniapp.yml`:
-```yaml
-name: Deploy MiniApp
-
-on:
-  push:
-    branches: [main]
-    paths:
-      - 'apps/miniapp/**'
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          
-      - name: Install dependencies
-        working-directory: ./apps/miniapp
-        run: npm ci
-        
-      - name: Build
-        working-directory: ./apps/miniapp
-        run: npm run build
-        env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.API_URL }}
-          
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v20
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ./apps/miniapp
-```
-
-## 🔒 Security Best Practices
-
-### 1. Content Security Policy
-
-В `next.config.js`:
-```javascript
-async headers() {
-  return [
-    {
-      source: '/:path*',
-      headers: [
-        {
-          key: 'Content-Security-Policy',
-          value: "frame-ancestors 'self' https://web.telegram.org https://telegram.org"
-        }
-      ]
-    }
-  ];
-}
-```
-
-### 2. Rate Limiting
-
-Настройте rate limiting на backend для `/miniapp/*` endpoints.
-
-### 3. Input Validation
-
-Всегда валидируйте пользовательский ввод на backend.
-
-### 4. CORS Configuration
-
-На backend:
-```javascript
-app.use(cors({
-  origin: [
-    'https://miniapp.yourdomain.com',
-    'https://web.telegram.org'
-  ],
-  credentials: true
-}));
-```
-
-## 🧪 Post-Deployment Testing
-
-### Checklist
-
-- [ ] Приложение открывается в Telegram
-- [ ] Авторизация работает
-- [ ] API запросы успешны
-- [ ] Все страницы загружаются
-- [ ] Навигация работает
-- [ ] Haptic feedback срабатывает
-- [ ] QR коды генерируются
-- [ ] Платежи работают
-- [ ] Логи чистые (без ошибок)
-
-### Test in Production
-
+**PM2:**
 ```bash
-# Откройте бота в Telegram
-t.me/your_bot_name
-
-# Нажмите на кнопку меню "Открыть VPN"
-# Проверьте все функции
+pm2 logs outlivion-miniapp
+pm2 monit
 ```
 
-## 📈 Performance Optimization
+---
 
-### 1. CDN Configuration
-
-Используйте CDN для статических файлов:
-- Vercel автоматически использует Edge Network
-- Для VPS настройте Cloudflare
-
-### 2. Image Optimization
-
-Next.js автоматически оптимизирует изображения:
-```typescript
-import Image from 'next/image';
-
-<Image 
-  src="/logo.png" 
-  width={200} 
-  height={200}
-  alt="Logo"
-/>
-```
-
-### 3. Code Splitting
-
-Используйте dynamic imports:
-```typescript
-import dynamic from 'next/dynamic';
-
-const QRCode = dynamic(() => import('qrcode.react'), {
-  ssr: false,
-  loading: () => <Loading />
-});
-```
-
-## 🔄 Updates & Rollback
+## 🔄 Updates and Rollback
 
 ### Vercel
-
 ```bash
-# Deploy новой версии
-vercel --prod
+# Deploy new version
+git push origin main  # Auto-deploys
 
-# Rollback к предыдущей
+# Rollback
 vercel rollback
 ```
 
 ### Docker
-
 ```bash
-# Deploy новой версии
-docker pull username/outlivion-miniapp:latest
+# Pull new image
+docker pull registry.outlivion.space/miniapp:latest
+
+# Stop old container
 docker stop outlivion-miniapp
 docker rm outlivion-miniapp
+
+# Start new
 docker run -d --name outlivion-miniapp ...
 
-# Rollback
-docker run -d --name outlivion-miniapp username/outlivion-miniapp:previous-tag
+# Rollback (use specific tag)
+docker run -d --name outlivion-miniapp registry.outlivion.space/miniapp:v1.9.0
 ```
 
-## 🆘 Troubleshooting
+### Manual/PM2
+```bash
+# Pull updates
+git pull origin main
 
-### Issue: "Cannot connect to API"
+# Install dependencies
+npm ci --only=production
 
-**Check:**
-1. Backend запущен и доступен
-2. CORS настроен правильно
-3. HTTPS работает
-4. Firewall правила корректны
+# Build
+npm run build
 
-### Issue: "Telegram не открывает MiniApp"
+# Restart
+pm2 restart outlivion-miniapp
 
-**Check:**
-1. HTTPS обязателен
-2. CSP headers настроены
-3. Web App URL правильный в @BotFather
-4. Домен соответствует
-
-### Issue: "401 Unauthorized"
-
-**Check:**
-1. initData корректно отправляется
-2. Backend проверяет подпись правильно
-3. Bot Token правильный на backend
-
-## 📞 Support
-
-При проблемах с deployment:
-1. Проверьте логи
-2. Проверьте консоль браузера
-3. Проверьте Network tab в DevTools
-4. Обратитесь к документации Telegram
-
-## 📚 Resources
-
-- [Telegram Bot API Documentation](https://core.telegram.org/bots/api)
-- [Telegram WebApp Documentation](https://core.telegram.org/bots/webapps)
-- [Vercel Documentation](https://vercel.com/docs)
-- [Next.js Deployment](https://nextjs.org/docs/deployment)
+# Rollback
+git checkout v1.9.0
+npm ci --only=production
+npm run build
+pm2 restart outlivion-miniapp
+```
 
 ---
 
-**Last Updated:** 2024
+## 🔐 Security Checklist
 
+- [ ] All secrets in environment variables (не в коде)
+- [ ] HTTPS enabled (SSL certificate)
+- [ ] Security headers configured
+- [ ] Rate limiting enabled in API
+- [ ] Firewall configured
+- [ ] Regular updates (`npm audit fix`)
+- [ ] Logs не содержат sensitive data
+- [ ] Telegram webhook uses secret token
+
+---
+
+## 📞 Support
+
+**Issues:** https://github.com/outlivion/outlivion-miniapp/issues
+**Docs:** https://github.com/outlivion/outlivion-miniapp/wiki
+**Email:** support@outlivion.space
+
+---
+
+**Last Updated:** December 2025  
+**Version:** 2.0.0

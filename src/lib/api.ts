@@ -2,10 +2,13 @@ import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from 'axios';
 import Cookies from 'js-cookie';
 import { tokenStorage } from './storage';
 import { isTelegramEnvironment } from './utils/environment';
+import { isTokenExpired } from './auth';
 
 // API configuration
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const REQUEST_TIMEOUT = 30000; // 30 seconds
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second base delay
 
 // Error response interface
 interface ApiErrorResponse {
@@ -39,16 +42,91 @@ const api: AxiosInstance = axios.create({
   },
 });
 
+// Track if refresh is in progress to prevent multiple simultaneous refresh attempts
+let isRefreshing = false;
+let failedQueue: Array<{
+  resolve: (value: string) => void;
+  reject: (error: any) => void;
+}> = [];
+
+const processQueue = (error: any = null, token: string | null = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token!);
+    }
+  });
+  
+  failedQueue = [];
+};
+
 // Request interceptor - add auth token from unified storage
 api.interceptors.request.use(
   async (config) => {
     // Get access token from unified storage (localStorage or cookies)
     let token = tokenStorage.getAccessToken();
     
-    // TODO Phase 3+: Add token refresh logic here
-    // if (token && isTokenExpired(token)) {
-    //   token = await refreshAccessToken();
-    // }
+    // Check if token is expired or about to expire (within 5 minutes)
+    if (token && isTokenExpired(token)) {
+      if (!isRefreshing) {
+        isRefreshing = true;
+        
+        try {
+          // Attempt to refresh the token
+          const refreshToken = tokenStorage.getRefreshToken();
+          
+          if (!refreshToken) {
+            // No refresh token, clear auth and redirect
+            tokenStorage.clearAll();
+            if (typeof window !== 'undefined') {
+              const loginPath = isTelegramEnvironment() ? '/telegram' : '/web/login';
+              window.location.href = loginPath;
+            }
+            return Promise.reject(new Error('No refresh token'));
+          }
+          
+          // Call refresh endpoint
+          const response = await authApi.refreshToken();
+          const newToken = response.accessToken || response.token;
+          
+          // Store new tokens
+          tokenStorage.setAccessToken(newToken);
+          if (response.refreshToken) {
+            tokenStorage.setRefreshToken(response.refreshToken);
+          }
+          
+          // Update token for current request
+          token = newToken;
+          
+          // Process queued requests
+          processQueue(null, newToken);
+        } catch (err) {
+          // Refresh failed, clear auth
+          processQueue(err, null);
+          tokenStorage.clearAll();
+          
+          if (typeof window !== 'undefined') {
+            const loginPath = isTelegramEnvironment() ? '/telegram' : '/web/login';
+            window.location.href = loginPath;
+          }
+          
+          return Promise.reject(err);
+        } finally {
+          isRefreshing = false;
+        }
+      } else {
+        // Wait for the refresh to complete
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then((newToken) => {
+          config.headers.Authorization = `Bearer ${newToken}`;
+          return config;
+        }).catch((err) => {
+          return Promise.reject(err);
+        });
+      }
+    }
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -61,12 +139,53 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor - handle errors
+/**
+ * Determine if error is retryable
+ */
+function isRetryableError(error: AxiosError): boolean {
+  if (!error.response) {
+    // Network errors are retryable
+    return true;
+  }
+  
+  const status = error.response.status;
+  
+  // Retry on 5xx server errors and 429 Too Many Requests
+  return status >= 500 || status === 429;
+}
+
+/**
+ * Sleep for exponential backoff
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Response interceptor - handle errors with retry logic
 api.interceptors.response.use(
   (response) => response,
-  (error: AxiosError<ApiErrorResponse>) => {
+  async (error: AxiosError<ApiErrorResponse>) => {
+    const config = error.config as any;
+    
+    // Initialize retry count
+    config._retryCount = config._retryCount || 0;
+    
     // Handle network errors
     if (!error.response) {
+      // Retry network errors
+      if (config._retryCount < MAX_RETRIES && isRetryableError(error)) {
+        config._retryCount++;
+        
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = RETRY_DELAY * Math.pow(2, config._retryCount - 1);
+        
+        console.log(`Retrying request (${config._retryCount}/${MAX_RETRIES}) after ${delay}ms...`);
+        
+        await sleep(delay);
+        
+        return api(config);
+      }
+      
       throw new ApiError(
         'Network error. Please check your connection.',
         0,
@@ -79,16 +198,45 @@ api.interceptors.response.use(
     const errorCode = data?.code;
     const errorDetails = data?.details;
 
-    // Handle 401 - Unauthorized
+    // Retry on 5xx errors or 429 (rate limit)
+    if (isRetryableError(error) && config._retryCount < MAX_RETRIES) {
+      config._retryCount++;
+      
+      // For 429, use Retry-After header if available
+      const retryAfter = error.response.headers['retry-after'];
+      const delay = retryAfter 
+        ? parseInt(retryAfter) * 1000 
+        : RETRY_DELAY * Math.pow(2, config._retryCount - 1);
+      
+      console.log(`Retrying request (${config._retryCount}/${MAX_RETRIES}) after ${delay}ms... Status: ${status}`);
+      
+      await sleep(delay);
+      
+      return api(config);
+    }
+
+    // Handle 401 - Unauthorized (don't retry)
     if (status === 401) {
       // Clear tokens from unified storage
       tokenStorage.clearAll();
       
       // Redirect to login based on environment
-      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-        const loginPath = isTelegramEnvironment() ? '/telegram/login' : '/web/login';
+      if (typeof window !== 'undefined') {
         const currentPath = window.location.pathname;
-        window.location.href = `${loginPath}?redirect=${encodeURIComponent(currentPath)}`;
+        
+        // For Telegram, redirect to home (which has auto-login)
+        // For Web, redirect to login page
+        if (isTelegramEnvironment()) {
+          // Don't redirect if already on /telegram home
+          if (currentPath !== '/telegram') {
+            window.location.href = '/telegram';
+          }
+        } else {
+          // Don't redirect if already on login
+          if (!currentPath.includes('/login')) {
+            window.location.href = `/web/login?redirect=${encodeURIComponent(currentPath)}`;
+          }
+        }
       }
     }
 
@@ -237,26 +385,23 @@ export const authApi = {
   }): Promise<AuthResponse> {
     const response = await apiClient.post<AuthResponse>('/auth/telegram', data);
     
-    // Note: Token storage is handled by unified auth module
-    // This is kept for backwards compatibility
-    if (response.accessToken || response.token) {
-      Cookies.set('token', response.accessToken || response.token, { expires: 1 });
-    }
-    if (response.refreshToken) {
-      Cookies.set('refreshToken', response.refreshToken, { expires: 7 });
-    }
+    // Note: Token storage is handled by unified auth module (src/lib/auth.ts)
+    // This function only returns the response, storage happens in auth.ts
     
     return response;
   },
 
   /**
    * Refresh access token
+   * Note: Token storage is handled by unified auth module
    */
   async refreshToken(): Promise<AuthResponse> {
-    const refreshToken = Cookies.get('refreshToken');
-    const telegramId = Cookies.get('telegramId');
+    const refreshToken = tokenStorage.getRefreshToken();
+    const telegramId = tokenStorage.getAccessToken() 
+      ? JSON.parse(atob(tokenStorage.getAccessToken()!.split('.')[1])).telegramId
+      : null;
     
-    if (!refreshToken || !telegramId) {
+    if (!refreshToken) {
       throw new ApiError('No refresh token available', 401, 'NO_REFRESH_TOKEN');
     }
     
@@ -265,24 +410,22 @@ export const authApi = {
       telegramId,
     });
     
-    Cookies.set('token', response.accessToken || response.token, { expires: 1 });
-    if (response.refreshToken) {
-      Cookies.set('refreshToken', response.refreshToken, { expires: 7 });
-    }
+    // Token storage is handled by auth.ts refreshAccessToken function
     
     return response;
   },
 
   /**
    * Logout
+   * Note: Logout logic is handled by unified auth module (src/lib/auth.ts)
    */
   logout(): void {
-    Cookies.remove('token');
-    Cookies.remove('refreshToken');
-    Cookies.remove('telegramId');
+    // Clear tokens using unified storage
+    tokenStorage.clearAll();
     
     if (typeof window !== 'undefined') {
-      window.location.href = '/login';
+      const loginPath = isTelegramEnvironment() ? '/telegram' : '/web/login';
+      window.location.href = loginPath;
     }
   },
 };
@@ -292,28 +435,85 @@ export const userApi = {
    * Get current user
    */
   async getUser(): Promise<User> {
-    return apiClient.get<User>('/user');
+    const user = await apiClient.get<User>('/user');
+    
+    // Ensure default values for optional fields
+    return {
+      ...user,
+      balance: user.balance ?? 0,
+      username: user.username ?? undefined,
+      firstName: user.firstName ?? undefined,
+      lastName: user.lastName ?? undefined,
+      photoUrl: user.photoUrl ?? undefined,
+    };
   },
 
   /**
    * Get user subscription
    */
   async getSubscription(): Promise<Subscription> {
-    return apiClient.get<Subscription>('/user/subscription');
+    try {
+      const subscription = await apiClient.get<Subscription>('/user/subscription');
+      
+      // Handle "no subscription" response
+      if (!subscription || subscription.status === 'none') {
+        return {
+          status: 'none',
+          message: 'No active subscription',
+          isExpired: true,
+          daysRemaining: 0,
+        };
+      }
+      
+      return {
+        ...subscription,
+        daysRemaining: subscription.daysRemaining ?? 0,
+        isExpired: subscription.isExpired ?? true,
+      };
+    } catch (error: any) {
+      // If 404 or no subscription found, return default
+      if (error.status === 404) {
+        return {
+          status: 'none',
+          message: 'No active subscription',
+          isExpired: true,
+          daysRemaining: 0,
+        };
+      }
+      throw error;
+    }
   },
 
   /**
    * Get payment history
    */
   async getPayments(): Promise<Payment[]> {
-    return apiClient.get<Payment[]>('/user/payments');
+    try {
+      const payments = await apiClient.get<Payment[]>('/user/payments');
+      return payments || [];
+    } catch (error: any) {
+      // If 404 or no payments, return empty array
+      if (error.status === 404) {
+        return [];
+      }
+      throw error;
+    }
   },
 
   /**
    * Get user's server configs
    */
   async getServers(): Promise<ServerConfig[]> {
-    return apiClient.get<ServerConfig[]>('/user/servers');
+    try {
+      const servers = await apiClient.get<ServerConfig[]>('/user/servers');
+      return servers || [];
+    } catch (error: any) {
+      // If 404 or no servers, return empty array
+      if (error.status === 404) {
+        return [];
+      }
+      throw error;
+    }
   },
 };
 

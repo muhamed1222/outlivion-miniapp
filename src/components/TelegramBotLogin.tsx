@@ -40,14 +40,16 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
   /**
    * Step 1: Create login token and redirect to bot
    */
-  const handleLoginClick = async () => {
+  const handleLoginClick = async (retryCount = 0) => {
     setLoading(true);
     setPolling(false);
     pollCountRef.current = 0;
 
     try {
       // Request login token from backend
-      const response = await axios.post(`${API_URL}/auth/bot/create-login-token`, {});
+      const response = await axios.post(`${API_URL}/auth/bot/create-login-token`, {
+        deviceInfo: navigator.userAgent,
+      });
       
       const { token: loginToken, botUrl } = response.data;
 
@@ -63,8 +65,44 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
       startPolling(loginToken);
     } catch (error: any) {
       console.error('[Bot Login] Failed to create token:', error);
+      
+      const status = error.response?.status;
+      const errorData = error.response?.data;
+      const errorMessage = errorData?.error || error.message;
+      
+      // Log detailed error for debugging
+      console.error('[Bot Login] Error details:', {
+        status,
+        error: errorMessage,
+        details: errorData?.details,
+        apiUrl: API_URL,
+      });
+      
+      // Retry once on 500 errors (server issues)
+      if (status === 500 && retryCount === 0) {
+        console.log('[Bot Login] Retrying after 500 error...');
+        setTimeout(() => handleLoginClick(1), 2000);
+        return;
+      }
+      
       setLoading(false);
-      onError(error.response?.data?.error || 'Failed to create login token');
+      
+      // Provide user-friendly error messages
+      let userMessage = 'Не удалось создать сессию входа';
+      
+      if (status === 500) {
+        userMessage = 'Ошибка сервера. Попробуйте позже или обратитесь в поддержку.';
+      } else if (status === 429) {
+        userMessage = 'Слишком много попыток. Подождите немного и попробуйте снова.';
+      } else if (status === 404) {
+        userMessage = 'API недоступен. Проверьте настройки или обратитесь в поддержку.';
+      } else if (!error.response) {
+        userMessage = 'Нет связи с сервером. Проверьте интернет-соединение.';
+      } else {
+        userMessage = errorMessage || userMessage;
+      }
+      
+      onError(userMessage);
     }
   };
 
@@ -210,11 +248,23 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
       )}
 
       {/* Development info */}
-      {process.env.NODE_ENV === 'development' && token && (
-        <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-          <p className="text-blue-300 text-xs font-mono break-all">
-            Token: {token}
-          </p>
+      {process.env.NODE_ENV === 'development' && (
+        <div className="space-y-2">
+          {token && (
+            <div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+              <p className="text-blue-300 text-xs font-mono break-all">
+                Token: {token}
+              </p>
+            </div>
+          )}
+          <div className="p-3 bg-neutral-900/50 border border-neutral-800 rounded-lg">
+            <p className="text-neutral-400 text-xs">
+              <span className="font-semibold">API:</span> {API_URL}
+            </p>
+            <p className="text-neutral-400 text-xs mt-1">
+              <span className="font-semibold">Endpoint:</span> /auth/bot/create-login-token
+            </p>
+          </div>
         </div>
       )}
     </div>
