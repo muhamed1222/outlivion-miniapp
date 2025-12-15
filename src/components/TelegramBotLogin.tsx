@@ -11,6 +11,8 @@ import axios from 'axios';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const POLL_INTERVAL = 2000; // Poll every 2 seconds
 const MAX_POLL_ATTEMPTS = 150; // 150 * 2s = 5 minutes
+const MAX_RETRIES = 3; // Maximum retry attempts for rate limiting
+const RETRY_DELAY_BASE = 2000; // Base delay in ms (2 seconds)
 
 interface TelegramBotLoginProps {
   onSuccess: (data: {
@@ -25,14 +27,20 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
   const [loading, setLoading] = useState(false);
   const [polling, setPolling] = useState(false);
   const [token, setToken] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [retryDelay, setRetryDelay] = useState(0);
   const pollCountRef = useRef(0);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cleanup polling on unmount
+  // Cleanup polling and retry timers on unmount
   useEffect(() => {
     return () => {
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
       }
     };
   }, []);
@@ -40,7 +48,7 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
   /**
    * Step 1: Create login token and redirect to bot
    */
-  const handleLoginClick = async (retryCount = 0) => {
+  const handleLoginClick = async () => {
     setLoading(true);
     setPolling(false);
     pollCountRef.current = 0;
@@ -57,6 +65,10 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
       console.log('[Bot Login] Bot URL:', botUrl);
 
       setToken(loginToken);
+      
+      // Reset retry state on success
+      setRetryCount(0);
+      setRetryDelay(0);
 
       // Open bot in new window/tab
       window.open(botUrl, '_blank');
@@ -78,13 +90,56 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
         apiUrl: API_URL,
       });
       
-      // Retry once on 500 errors (server issues)
-      if (status === 500 && retryCount === 0) {
-        console.log('[Bot Login] Retrying after 500 error...');
-        setTimeout(() => handleLoginClick(1), 2000);
+      // Handle 429 (Rate Limit) with retry logic
+      if (status === 429 && retryCount < MAX_RETRIES) {
+        const currentRetry = retryCount + 1;
+        
+        // Get Retry-After header if available
+        const retryAfter = error.response?.headers['retry-after'];
+        const delay = retryAfter 
+          ? parseInt(retryAfter) * 1000 
+          : RETRY_DELAY_BASE * Math.pow(2, retryCount); // Exponential backoff: 2s, 4s, 8s
+        
+        console.log(`[Bot Login] Rate limited. Retrying in ${delay}ms (attempt ${currentRetry}/${MAX_RETRIES})...`);
+        
+        setRetryCount(currentRetry);
+        setRetryDelay(Math.ceil(delay / 1000)); // Convert to seconds for display
+        
+        // Show countdown
+        const countdownInterval = setInterval(() => {
+          setRetryDelay((prev) => {
+            if (prev <= 1) {
+              clearInterval(countdownInterval);
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+        
+        // Retry after delay
+        retryTimeoutRef.current = setTimeout(() => {
+          clearInterval(countdownInterval);
+          setRetryDelay(0);
+          handleLoginClick();
+        }, delay);
+        
         return;
       }
       
+      // Retry once on 500 errors (server issues)
+      if (status === 500 && retryCount === 0) {
+        console.log('[Bot Login] Retrying after 500 error...');
+        setRetryCount(1);
+        setTimeout(() => {
+          setRetryCount(0);
+          handleLoginClick();
+        }, 2000);
+        return;
+      }
+      
+      // Reset retry state
+      setRetryCount(0);
+      setRetryDelay(0);
       setLoading(false);
       
       // Provide user-friendly error messages
@@ -93,7 +148,7 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
       if (status === 500) {
         userMessage = 'Ошибка сервера. Попробуйте позже или обратитесь в поддержку.';
       } else if (status === 429) {
-        userMessage = 'Слишком много попыток. Подождите немного и попробуйте снова.';
+        userMessage = 'Слишком много попыток. Подождите 1-2 минуты и попробуйте снова.';
       } else if (status === 404) {
         userMessage = 'API недоступен. Проверьте настройки или обратитесь в поддержку.';
       } else if (!error.response) {
@@ -194,19 +249,25 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
     }
+    
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+    }
 
     setPolling(false);
     setLoading(false);
     setToken(null);
+    setRetryCount(0);
+    setRetryDelay(0);
     pollCountRef.current = 0;
   };
 
   return (
     <div className="space-y-4">
-      {!polling ? (
+      {!polling && retryDelay === 0 ? (
         // Login button
         <button
-          onClick={() => handleLoginClick()}
+          onClick={handleLoginClick}
           disabled={loading}
           className="w-full py-4 px-6 bg-[#F55128] hover:bg-[#e04520] text-white font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
         >
@@ -215,6 +276,35 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
           </svg>
           {loading ? 'Открываем бота...' : 'Войти через Telegram'}
         </button>
+      ) : retryDelay > 0 ? (
+        // Retry countdown
+        <div className="w-full p-6 bg-yellow-900/20 border border-yellow-500/30 rounded-xl">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+            
+            <div className="text-center">
+              <p className="text-yellow-300 font-medium mb-2">
+                Слишком много попыток
+              </p>
+              <p className="text-yellow-400 text-sm mb-1">
+                Повторная попытка через
+              </p>
+              <p className="text-yellow-500 text-2xl font-bold mb-4">
+                {retryDelay} сек
+              </p>
+              <p className="text-yellow-500/70 text-xs mb-4">
+                Попытка {retryCount}/{MAX_RETRIES}
+              </p>
+              
+              <button
+                onClick={handleCancel}
+                className="px-4 py-2 text-sm text-yellow-400 hover:text-yellow-300 border border-yellow-500/30 hover:border-yellow-500/50 rounded-lg transition-colors"
+              >
+                Отменить
+              </button>
+            </div>
+          </div>
+        </div>
       ) : (
         // Polling state - waiting for confirmation
         <div className="w-full p-6 bg-neutral-900 border border-neutral-800 rounded-xl">
