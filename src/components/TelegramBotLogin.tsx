@@ -226,10 +226,13 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
                 Ожидаем подтверждение в Telegram
               </p>
               <p className="text-neutral-400 text-sm mb-1">
-                Откройте бота и нажмите <span className="font-semibold text-[#F55128]">Start</span>
+                Откройте бота в Telegram
+              </p>
+              <p className="text-neutral-500 text-xs mb-2">
+                Если кнопка <span className="font-semibold text-[#F55128]">Start</span> не показывается, просто напишите боту любое сообщение
               </p>
               <p className="text-neutral-500 text-xs mb-4">
-                для подтверждения входа
+                Затем нажмите кнопку подтверждения в боте
               </p>
               <div className="flex items-center justify-center gap-2 text-neutral-500 text-xs">
                 <div className="w-2 h-2 bg-[#F55128] rounded-full animate-pulse"></div>

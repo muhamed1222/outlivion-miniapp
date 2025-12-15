@@ -184,7 +184,7 @@ async function handleMessage(update: TelegramUpdate) {
         const token = sessionCheck.data.token;
         console.log('[BOT] Found pending login session, showing confirmation:', { telegramId, token, command: text });
         
-        await sendMessage(chatId, '🔐 **Подтверждение входа в Outlivion Web Portal**\n\nВы пытаетесь войти через браузер.\nПодтвердите вход нажав кнопку ниже:', {
+        await sendMessage(chatId, '🔐 **Подтверждение входа в Outlivion Web Portal**\n\nВы пытаетесь войти через браузер.\n\nПодтвердите вход, нажав кнопку ниже:', {
           parse_mode: 'Markdown',
           reply_markup: {
             inline_keyboard: [
@@ -288,6 +288,28 @@ async function handleCallbackQuery(update: TelegramUpdate) {
       await sendMessage(
         chatId,
         '💬 Для связи с поддержкой напишите: @outlivion_support'
+      )
+    } else if (callbackData.startsWith('confirm_login_')) {
+      // Обработка подтверждения входа через callback
+      const token = callbackData.replace('confirm_login_', '')
+      console.log('[BOT] Confirm login callback:', { chatId, telegramId: query.from.id, token })
+      
+      await answerCallback('✅ Подтверждаю вход...')
+      
+      // Подтверждаем вход
+      await handleDeepLinkLogin(chatId, query.from, token)
+    } else if (callbackData === 'cancel_login') {
+      // Отмена входа
+      console.log('[BOT] Cancel login callback:', { chatId, telegramId: query.from.id })
+      
+      await answerCallback('❌ Вход отменен')
+      
+      await sendMessage(
+        chatId,
+        '❌ **Вход отменен**\n\nВы отменили авторизацию. Если хотите войти, вернитесь на сайт и запросите новую ссылку.',
+        {
+          parse_mode: 'Markdown',
+        }
       )
     } else {
       // Обработка неизвестных callback_data
