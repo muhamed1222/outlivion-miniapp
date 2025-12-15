@@ -58,7 +58,7 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
 
           // Добавляем таймаут для логина (10 секунд), чтобы не висело вечно
           const loginPromise = autoLoginTelegramMiniApp();
-          const timeoutPromise = new Promise<{ success: boolean; error?: string }>((resolve) => {
+          const timeoutPromise = new Promise<{ success: boolean; user?: any; error?: string }>((resolve) => {
             setTimeout(() => {
                 resolve({ success: false, error: 'Timeout waiting for auto-login (possible API connection issue)' });
             }, 8000); 
