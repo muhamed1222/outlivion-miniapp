@@ -42,7 +42,7 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // 3. Попытка auto-login для Telegram пользователей
+          // 3. Попытка auto-login для Telegram пользователей
         if (inTelegram || process.env.NODE_ENV === 'development') {
           console.log('Attempting auto-login...');
           
@@ -56,7 +56,15 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
             return;
           }
 
-          const result = await autoLoginTelegramMiniApp();
+          // Добавляем таймаут для логина (10 секунд), чтобы не висело вечно
+          const loginPromise = autoLoginTelegramMiniApp();
+          const timeoutPromise = new Promise<{ success: boolean; error?: string }>((resolve) => {
+            setTimeout(() => {
+                resolve({ success: false, error: 'Timeout waiting for auto-login (possible API connection issue)' });
+            }, 8000); 
+          });
+
+          const result = await Promise.race([loginPromise, timeoutPromise]);
           
           if (result.success) {
             console.log('Auto-login successful:', result.user);
@@ -66,9 +74,13 @@ export function TelegramProvider({ children }: { children: React.ReactNode }) {
               router.refresh();
             }
           } else {
-            console.warn('Auto-login failed:', result.error);
-            // Не показываем ошибку пользователю, просто логируем
-            // В dev режиме это нормально
+            console.warn('Auto-login failed or timed out:', result.error);
+            // Не блокируем приложение, даем пользователю войти вручную или увидеть ошибку на странице
+            if (result.error?.includes('Timeout') && process.env.NODE_ENV === 'production') {
+               // Если таймаут, возможно проблема с API, но мы все равно пускаем пользователя
+               // Можно сохранить ошибку в стейт, чтобы показать тост
+               console.error('API Connection timeout during init');
+            }
           }
         }
 
