@@ -1,11 +1,9 @@
 import { TelegramProvider } from '@/components/telegram-provider';
-import { NavigationBar } from '@/components/navigation-bar';
 import { ErrorBoundary } from '@/components/error-boundary';
 
 /**
  * Layout для Telegram Mini App
  * Включает TelegramProvider для работы с Telegram WebApp API
- * и NavigationBar для навигации внизу экрана
  */
 export default function TelegramLayout({
   children,
@@ -16,13 +14,9 @@ export default function TelegramLayout({
     <ErrorBoundary>
       <TelegramProvider>
         <div className="min-h-screen bg-background-primary">
-          {/* Основной контент с padding снизу для NavigationBar */}
-          <main className="pb-20">
+          <main>
             {children}
           </main>
-          
-          {/* Фиксированная навигация внизу */}
-          <NavigationBar />
         </div>
       </TelegramProvider>
     </ErrorBoundary>

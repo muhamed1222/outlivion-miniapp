@@ -7,7 +7,7 @@ import { isTokenExpired } from './auth';
 // API configuration
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const REQUEST_TIMEOUT = 30000; // 30 seconds
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 1;
 const RETRY_DELAY = 1000; // 1 second base delay
 
 // Error response interface
@@ -151,7 +151,8 @@ function isRetryableError(error: AxiosError): boolean {
   const status = error.response.status;
   
   // Retry on 5xx server errors and 429 Too Many Requests
-  return status >= 500 || status === 429;
+  // Do NOT retry on 401 (Unauthorized) or 403 (Forbidden)
+  return (status >= 500 || status === 429) && status !== 401 && status !== 403;
 }
 
 /**

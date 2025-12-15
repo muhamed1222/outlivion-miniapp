@@ -1,47 +1,49 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
-import { NavigationBar } from '@/components/navigation-bar';
 import { useToast } from '@/components/ui/toast';
-import { billingApi, userApi, User, Payment } from '@/lib/api';
+import { billingApi, userApi, User } from '@/lib/api';
+import { tokenStorage } from '@/lib/storage';
 import { hapticImpact, hapticNotification, showBackButton, hideBackButton, openLink } from '@/lib/telegram';
-import { formatPrice, formatDateTime, cn } from '@/lib/utils';
+import { formatPrice, cn } from '@/lib/utils';
 
 interface TariffPlan {
   id: string;
   name: string;
   price: number;
   duration: number;
-  description?: string;
-  popular?: boolean;
+  monthlyPrice?: number;
 }
 
 const defaultTariffs: TariffPlan[] = [
   {
-    id: 'monthly',
-    name: 'Месячный',
-    price: 100,
+    id: '1month',
+    name: '1 месяц',
+    price: 99,
     duration: 30,
-    description: '30 дней доступа',
-    popular: true,
   },
   {
-    id: 'quarterly',
-    name: 'Квартальный',
-    price: 270,
+    id: '3months',
+    name: '3 месяца',
+    price: 390,
     duration: 90,
-    description: '90 дней доступа, скидка 10%',
+    monthlyPrice: 130,
   },
   {
-    id: 'yearly',
-    name: 'Годовой',
-    price: 960,
+    id: '6months',
+    name: '6 месяцев',
+    price: 720,
+    duration: 180,
+    monthlyPrice: 120,
+  },
+  {
+    id: '1year',
+    name: '1 год',
+    price: 1320,
     duration: 365,
-    description: '365 дней доступа, скидка 20%',
+    monthlyPrice: 110,
   },
 ];
 
@@ -50,17 +52,17 @@ export default function BillingPage() {
   const { showToast } = useToast();
   
   const [user, setUser] = useState<User | null>(null);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [tariffs, setTariffs] = useState<TariffPlan[]>(defaultTariffs);
-  const [selectedTariff, setSelectedTariff] = useState<string>('monthly');
+  const [tariffs] = useState<TariffPlan[]>(defaultTariffs);
+  const [selectedTariff, setSelectedTariff] = useState<string>('6months');
+  const [deviceCount, setDeviceCount] = useState<number>(1);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
     // Показать кнопку "Назад" в Telegram
     showBackButton(() => {
-      router.push('/');
+      router.push('/telegram');
     });
 
     return () => {
@@ -69,29 +71,29 @@ export default function BillingPage() {
   }, [router]);
 
   useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+
     async function fetchData() {
+      // Check if we have an auth token before making requests
+      const token = tokenStorage.getAccessToken();
+      if (!token) {
+        console.log('No auth token found, skipping data fetch');
+        setLoading(false);
+        return;
+      }
+
       try {
-        const [userData, paymentsData] = await Promise.all([
-          userApi.getUser(),
-          userApi.getPayments().catch(() => []),
-        ]);
-
+        const userData = await userApi.getUser();
         setUser(userData);
-        setPayments(paymentsData);
-
-        // Попытка загрузить тарифы с сервера
-        // TODO Phase 3: Add billingApi.getTariffs() endpoint
-        // try {
-        //   const tariffsData = await billingApi.getTariffs();
-        //   if (tariffsData && tariffsData.length > 0) {
-        //     setTariffs(tariffsData as TariffPlan[]);
-        //   }
-        // } catch (error) {
-        //   console.log('Using default tariffs');
-        // }
       } catch (error: any) {
-        console.error('Failed to fetch data:', error);
-        showToast(error.message || 'Ошибка загрузки данных', 'error');
+        // Тихая обработка ошибок авторизации (нормально для разработки без Telegram)
+        if (error?.response?.status === 401 || error?.message?.includes('No token')) {
+          console.log('User not authenticated, continuing without user data');
+        } else {
+          console.error('Failed to fetch data:', error);
+          showToast(error.message || 'Ошибка загрузки данных', 'error');
+        }
       } finally {
         setLoading(false);
       }
@@ -103,6 +105,11 @@ export default function BillingPage() {
   const handleSelectTariff = (tariffId: string) => {
     hapticImpact('light');
     setSelectedTariff(tariffId);
+  };
+
+  const handleDeviceCountChange = (count: number) => {
+    hapticImpact('light');
+    setDeviceCount(count);
   };
 
   const handlePayment = async () => {
@@ -137,231 +144,160 @@ export default function BillingPage() {
     }
   };
 
-  const getPaymentStatusColor = (status: string): string => {
-    const colors: Record<string, string> = {
-      completed: 'text-status-success',
-      pending: 'text-status-warning',
-      failed: 'text-status-error',
-      cancelled: 'text-text-tertiary',
-    };
-    return colors[status.toLowerCase()] || 'text-text-secondary';
-  };
-
-  const getPaymentStatusText = (status: string): string => {
-    const texts: Record<string, string> = {
-      completed: 'Завершён',
-      pending: 'В обработке',
-      failed: 'Ошибка',
-      cancelled: 'Отменён',
-    };
-    return texts[status.toLowerCase()] || status;
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background-primary">
+      <div className="min-h-screen flex items-center justify-center bg-[#0D0D0D]">
         <Loading size="lg" />
       </div>
     );
   }
 
   const selectedPlan = tariffs.find(t => t.id === selectedTariff);
+  const totalPrice = selectedPlan ? selectedPlan.price * deviceCount : 0;
 
   return (
-    <div className="min-h-screen bg-background-primary pb-20">
-      {/* Background */}
-      <div className="fixed top-0 left-0 w-96 h-96 bg-primary-main rounded-full filter blur-[128px] opacity-20 pointer-events-none" />
+    <div className="relative min-h-screen bg-[#0D0D0D] text-white font-sans flex items-center justify-center">
+      
+      {/* Main Content */}
+      <main className="relative z-10 px-5 pt-4 pb-8 w-full max-w-[360px]">
+        <div className="flex flex-col gap-[30px] w-full">
+          {/* Title Section */}
+          <div className="flex flex-col gap-3">
+            <h2 className="text-lg font-medium text-white">Покупка подписки</h2>
+            <p className="text-sm text-white/60">
+              Выберите интересующий тариф и количество устройств
+            </p>
+          </div>
 
-      {/* Main container */}
-      <div className="max-w-[448px] mx-auto p-4 space-y-4 animate-fade-in">
-        {/* Header */}
-        <div className="text-center pt-2 pb-4">
-          <h1 className="text-3xl font-bold text-text-primary mb-2">Оплата</h1>
-          <p className="text-text-secondary">Выберите тарифный план</p>
-        </div>
-
-        {/* Balance Card */}
-        {user && (
-          <Card>
-            <CardContent className="p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-text-secondary text-sm mb-1">Текущий баланс</p>
-                  <p className="text-3xl font-bold text-text-primary">
-                    {formatPrice(user.balance || 0)}
-                  </p>
-                </div>
-                <div className="w-12 h-12 rounded-full bg-primary-main/20 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-primary-main" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                </div>
+          {/* Device Count Selector */}
+          <div className="flex flex-col gap-3">
+            <p className="text-base font-medium text-white">
+              Количество устройств: {deviceCount}
+            </p>
+            <div className="relative h-[30px] w-full">
+              {/* Slider Track */}
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full h-1 bg-gradient-to-r from-[#F55128] to-[#C93D1A] rounded-full" />
               </div>
-            </CardContent>
-          </Card>
-        )}
+              {/* Slider Dots */}
+              <div className="absolute inset-0 flex items-center justify-between px-1">
+                {[1, 2, 3, 4, 5].map((count) => (
+                  <button
+                    key={count}
+                    onClick={() => handleDeviceCountChange(count)}
+                    className={cn(
+                      'relative z-10 transition-all',
+                      deviceCount === count
+                        ? 'w-6 h-6 rounded-full border-2 border-[#F55128] bg-[#F55128] shadow-lg shadow-[#F55128]/50'
+                        : 'w-3 h-3 rounded-full bg-[#F55128] opacity-60'
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
 
-        {/* Tariffs */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-text-primary">Тарифные планы</h2>
-          
-          {tariffs.map((tariff) => (
-            <Card
-              key={tariff.id}
-              className={cn(
-                'cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] relative overflow-hidden',
-                selectedTariff === tariff.id && 'border-primary-main bg-primary-main/10'
-              )}
-              onClick={() => handleSelectTariff(tariff.id)}
-            >
-              {tariff.popular && (
-                <div className="absolute top-0 right-0 bg-primary-main text-white text-xs font-bold px-3 py-1 rounded-bl-xl">
-                  Популярный
-                </div>
-              )}
-              
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-text-primary mb-1">
-                      {tariff.name}
-                    </h3>
-                    <p className="text-text-secondary text-sm">
-                      {tariff.description || `${tariff.duration} дней`}
-                    </p>
-                  </div>
-                  
-                  <div className="text-right">
-                    <p className="text-3xl font-bold text-text-primary">
-                      {tariff.price}₽
-                    </p>
-                    <p className="text-text-secondary text-xs">
-                      {Math.round(tariff.price / (tariff.duration / 30))}₽/мес
-                    </p>
-                  </div>
-                </div>
-
-                {selectedTariff === tariff.id && (
-                  <div className="flex items-center gap-2 text-primary-main font-medium text-sm">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    Выбрано
-                  </div>
+          {/* Tariff Plans Grid */}
+          <div className="flex flex-col gap-2">
+            {/* First Row */}
+            <div className="flex gap-2">
+              {/* 1 Month */}
+              <button
+                onClick={() => handleSelectTariff('1month')}
+                className={cn(
+                  'flex-1 flex flex-col items-center justify-center gap-[30px] h-40 p-5 rounded-[20px] transition-all active:scale-[0.98]',
+                  'backdrop-blur-[7.5px] bg-gradient-to-t from-[#8f290f] to-[#4b180b]',
+                  selectedTariff === '1month'
+                    ? 'border-2 border-[#F55128]'
+                    : 'border border-[rgba(245,81,40,0.4)]'
                 )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Payment Button */}
-        <Card className="border-primary-main/30 bg-primary-main/5">
-          <CardContent className="p-5">
-            <div className="mb-4">
-              <p className="text-text-secondary text-sm mb-2">К оплате:</p>
-              <p className="text-4xl font-bold text-text-primary">
-                {selectedPlan ? formatPrice(selectedPlan.price) : '0 ₽'}
-              </p>
-            </div>
-
-            <Button
-              onClick={handlePayment}
-              disabled={!selectedTariff || processing}
-              className="w-full"
-              size="lg"
-            >
-              {processing ? (
-                <>
-                  <Loading size="sm" className="mr-2" />
-                  Обработка...
-                </>
-              ) : (
-                'Перейти к оплате'
-              )}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Payment History */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>История платежей</CardTitle>
-              <Button
-                onClick={() => {
-                  hapticImpact('light');
-                  setShowHistory(!showHistory);
-                }}
-                variant="ghost"
-                size="sm"
               >
-                {showHistory ? 'Скрыть' : 'Показать'}
-              </Button>
-            </div>
-          </CardHeader>
-          
-          {showHistory && (
-            <CardContent>
-              {payments.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 rounded-full bg-background-tertiary flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <p className="text-text-secondary">Нет платежей</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {payments.slice(0, 5).map((payment) => (
-                    <div
-                      key={payment.id}
-                      className="p-4 bg-background-tertiary rounded-xl"
-                    >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-semibold text-text-primary">
-                            {formatPrice(payment.amount)}
-                          </span>
-                        <span className={cn('text-sm font-medium', getPaymentStatusColor(payment.status))}>
-                          {getPaymentStatusText(payment.status)}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-text-secondary">{payment.plan}</span>
-                        <span className="text-text-tertiary">{formatDateTime(payment.createdAt)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          )}
-        </Card>
+                <p className="text-base font-medium text-white text-center">1 месяц</p>
+                <p className="text-[26px] font-semibold text-white">99 ₽</p>
+              </button>
 
-        {/* Info */}
-        <Card className="border-border-light">
-          <CardContent className="p-5">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary-main/20 flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-primary-main" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h4 className="font-semibold text-text-primary mb-1">
-                  Безопасная оплата
-                </h4>
-                <p className="text-text-secondary text-sm">
-                  Все платежи защищены и обрабатываются через безопасное соединение
-                </p>
-              </div>
+              {/* 3 Months */}
+              <button
+                onClick={() => handleSelectTariff('3months')}
+                className={cn(
+                  'flex-1 flex flex-col items-center justify-center gap-[30px] h-40 p-5 rounded-[20px] transition-all active:scale-[0.98]',
+                  'backdrop-blur-[7.5px] bg-gradient-to-t from-[#8f290f] to-[#4b180b]',
+                  selectedTariff === '3months'
+                    ? 'border-2 border-[#F55128]'
+                    : 'border border-[rgba(245,81,40,0.4)]'
+                )}
+              >
+                <p className="text-base font-medium text-white text-center">3 месяца</p>
+                <div className="flex flex-col gap-1 items-center">
+                  <p className="text-[26px] font-semibold text-white">390 ₽</p>
+                  <p className="text-sm font-normal text-white/60">130 ₽ в месяц</p>
+                </div>
+              </button>
             </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      <NavigationBar />
+            {/* Second Row */}
+            <div className="flex gap-2">
+              {/* 6 Months */}
+              <button
+                onClick={() => handleSelectTariff('6months')}
+                className={cn(
+                  'flex-1 flex flex-col items-center justify-center gap-[30px] h-40 p-5 rounded-[20px] transition-all active:scale-[0.98]',
+                  'backdrop-blur-[7.5px] bg-gradient-to-t from-[#de4620] to-[#4b180b]',
+                  selectedTariff === '6months'
+                    ? 'border-2 border-[#F55128]'
+                    : 'border border-[rgba(245,81,40,0.4)]'
+                )}
+              >
+                <p className="text-base font-medium text-white text-center">6 месяцев</p>
+                <div className="flex flex-col gap-1 items-center">
+                  <p className="text-[26px] font-semibold text-white">720 ₽</p>
+                  <p className="text-sm font-normal text-white/60">120 ₽ в месяц</p>
+                </div>
+              </button>
+
+              {/* 1 Year */}
+              <button
+                onClick={() => handleSelectTariff('1year')}
+                className={cn(
+                  'flex-1 flex flex-col items-center justify-center gap-[30px] h-40 p-5 rounded-[20px] transition-all active:scale-[0.98]',
+                  'backdrop-blur-[7.5px] bg-gradient-to-t from-[#8f290f] to-[#4b180b]',
+                  selectedTariff === '1year'
+                    ? 'border-2 border-[#F55128]'
+                    : 'border border-[rgba(245,81,40,0.4)]'
+                )}
+              >
+                <p className="text-base font-medium text-white text-center">1 год</p>
+                <div className="flex flex-col gap-1 items-center">
+                  <p className="text-[26px] font-semibold text-white">1 320 ₽</p>
+                  <p className="text-sm font-normal text-white/60">110 ₽ в месяц</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          {/* Payment Button */}
+          <button
+            onClick={handlePayment}
+            disabled={!selectedTariff || processing}
+            className={cn(
+              'w-full flex items-center justify-between px-4 h-[51px] rounded-[36px] transition-all active:scale-[0.98]',
+              'backdrop-blur-[7.5px] bg-[#F55128]',
+              (!selectedTariff || processing) && 'opacity-50 cursor-not-allowed'
+            )}
+          >
+            {processing ? (
+              <>
+                <Loading size="sm" className="text-white" />
+                <span className="text-base font-medium text-white">Обработка...</span>
+              </>
+            ) : (
+              <span className="text-base font-medium text-white w-full text-center">
+                Оплатить {formatPrice(totalPrice)}
+              </span>
+            )}
+          </button>
+        </div>
+      </main>
     </div>
   );
 }
-

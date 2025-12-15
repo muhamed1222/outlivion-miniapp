@@ -46,6 +46,25 @@ export default function LoginPage() {
   };
 
 
+  // Handle dev login
+  const handleDevLogin = async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/auth/dev/login`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Dev login failed');
+      }
+      
+      const data = await response.json();
+      handleLoginSuccess(data);
+    } catch (err: any) {
+      handleLoginError(err.message);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black flex justify-center">
         {/* Gradient background - orange blur top left */}
@@ -88,6 +107,19 @@ export default function LoginPage() {
                 onError={handleLoginError}
               />
             </div>
+            
+            {/* Dev Login Button (only in development) */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mb-8">
+                <button
+                  onClick={handleDevLogin}
+                  className="w-full flex items-center justify-center gap-3 bg-neutral-800 hover:bg-neutral-700 text-white font-medium py-3.5 px-4 rounded-xl transition-all duration-200"
+                >
+                  <span className="text-xl">🛠️</span>
+                  <span>Быстрый вход (Dev)</span>
+                </button>
+              </div>
+            )}
 
             {/* Divider */}
             <div className="relative mb-8">

@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import '@/styles/globals.css'
 import { ToastProvider } from '@/components/ui/toast'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+import NextTopLoader from 'nextjs-toploader'
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'] })
 
@@ -31,12 +32,23 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ru">
+    <html lang="ru" suppressHydrationWarning>
       <head>
         {/* Telegram WebApp script загружается для всех страниц для обеспечения совместимости */}
         <script src="https://telegram.org/js/telegram-web-app.js" async></script>
       </head>
       <body className={inter.className}>
+        <NextTopLoader
+          color="#F55128"
+          initialPosition={0.08}
+          crawlSpeed={200}
+          height={3}
+          crawl={true}
+          showSpinner={false}
+          easing="ease"
+          speed={200}
+          shadow="0 0 10px #F55128,0 0 5px #F55128"
+        />
         <ToastProvider>
           {children}
         </ToastProvider>

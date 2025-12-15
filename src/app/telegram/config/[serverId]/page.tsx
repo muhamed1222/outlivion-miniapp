@@ -6,7 +6,6 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
-import { NavigationBar } from '@/components/navigation-bar';
 import { useToast } from '@/components/ui/toast';
 import { serverApi, ServerConfig } from '@/lib/api';
 import { hapticImpact, hapticNotification, showBackButton, hideBackButton, showConfirm } from '@/lib/telegram';
@@ -143,7 +142,6 @@ export default function ConfigPage() {
             </CardContent>
           </Card>
         </div>
-        <NavigationBar />
       </div>
     );
   }
@@ -305,8 +303,6 @@ export default function ConfigPage() {
           </Button>
         </div>
       </div>
-
-      <NavigationBar />
     </div>
   );
 }

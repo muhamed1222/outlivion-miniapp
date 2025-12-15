@@ -1,14 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
 import { useToast } from '@/components/ui/toast';
 import { userApi, User, Subscription } from '@/lib/api';
-import { getTelegramUser, hapticImpact } from '@/lib/telegram';
-import { formatPrice, getInitials, copyToClipboard } from '@/lib/utils';
+import { tokenStorage } from '@/lib/storage';
+import { hapticImpact } from '@/lib/telegram';
+import { Settings, User as UserIcon, HelpCircle } from 'lucide-react';
 
 export default function TelegramHomePage() {
   const router = useRouter();
@@ -16,9 +15,21 @@ export default function TelegramHomePage() {
   const [user, setUser] = useState<User | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+
     async function fetchData() {
+      // Check if we have an auth token before making requests
+      const token = tokenStorage.getAccessToken();
+      if (!token) {
+        console.log('No auth token found, skipping data fetch');
+        setLoading(false);
+        return;
+      }
+
       try {
         const [userData, subscriptionData] = await Promise.all([
           userApi.getUser(),
@@ -28,8 +39,13 @@ export default function TelegramHomePage() {
         setUser(userData);
         setSubscription(subscriptionData);
       } catch (error: any) {
-        console.error('Failed to fetch data:', error);
-        showToast(error.message || 'Ошибка загрузки данных', 'error');
+        // Тихая обработка ошибок авторизации (нормально для разработки без Telegram)
+        if (error?.response?.status === 401 || error?.message?.includes('No token')) {
+          console.log('User not authenticated, continuing without user data');
+        } else {
+          console.error('Failed to fetch data:', error);
+          showToast(error.message || 'Ошибка загрузки данных', 'error');
+        }
       } finally {
         setLoading(false);
       }
@@ -38,208 +54,158 @@ export default function TelegramHomePage() {
     fetchData();
   }, [showToast]);
 
-  const handleCopyReferralLink = async () => {
-    if (!user) return;
-    
+  const handleNavigation = (path: string) => {
     hapticImpact('light');
-    const referralLink = `https://t.me/outlivionbot?start=${user.telegramId}`;
-    const success = await copyToClipboard(referralLink);
-    
-    if (success) {
-      showToast('Ссылка скопирована!', 'success');
-    } else {
-      showToast('Ошибка копирования', 'error');
-    }
-  };
-
-  const handleTopUp = () => {
-    hapticImpact('light');
-    router.push('/telegram/billing');
-  };
-
-  const handleViewSubscription = () => {
-    hapticImpact('light');
-    router.push('/telegram/subscription');
+    router.push(path);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background-primary">
-        <Loading size="lg" />
+      <div className="min-h-screen flex items-center justify-center bg-[#0D0D0D]">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#F55128] border-t-transparent"></div>
       </div>
     );
   }
 
-  const telegramUser = getTelegramUser();
-  const displayName = user?.firstName || telegramUser?.first_name || 'Пользователь';
-  const balance = user?.balance || 0;
-  const isLowBalance = balance <= 0;
+  // Format date for display (e.g., "8 декабря 2025")
+  const formatSubscriptionDate = (dateString: string | Date | undefined): string => {
+    if (!dateString) return 'Подписка не активна';
+    const date = new Date(dateString);
+    const months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    const day = date.getDate();
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `до ${day} ${month} ${year}`;
+  };
+
+  // Calculate subscription status text
+  const isSubActive = subscription?.status === 'active';
+  const subStatusText = isSubActive ? 'Активная подписка' : 'пробный период';
+  const subDateText = formatSubscriptionDate(subscription?.expiresAt);
+
+  // Device detection (simplified)
+  const devicePlatform = 'macOS'; // In a real app, detect UA or user pref
 
   return (
-    <div className="min-h-screen bg-background-primary">
-      {/* Background glow */}
-      <div className="fixed top-0 left-0 w-96 h-96 bg-primary-main rounded-full filter blur-[128px] opacity-20 pointer-events-none animate-blob" />
+    <div className="min-h-screen bg-[#0D0D0D] text-white relative overflow-hidden font-sans selection:bg-[#F55128]/30">
+      
+      {/* Background Gradients (Ellipses from Figma) */}
+      <div className="absolute top-[-50px] left-[-50px] w-[450px] h-[450px] bg-[#F55128] rounded-full blur-[150px] opacity-20 pointer-events-none" />
+      <div className="absolute top-[10%] right-[-100px] w-[300px] h-[300px] bg-[#F55128] rounded-full blur-[120px] opacity-10 pointer-events-none" />
+      <div className="absolute bottom-[-100px] left-[20%] w-[350px] h-[350px] bg-[#F55128] rounded-full blur-[130px] opacity-15 pointer-events-none" />
 
-      {/* Main container */}
-      <div className="max-w-[448px] mx-auto p-4 space-y-4 animate-fade-in">
-        {/* Header with user info */}
-        <Card className="p-5">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-primary-main/20 flex items-center justify-center">
-              {user?.photoUrl || telegramUser?.photo_url ? (
-                <img
-                  src={user?.photoUrl || telegramUser?.photo_url}
-                  alt="Avatar"
-                  className="w-full h-full rounded-full object-cover"
-                />
-              ) : (
-                <span className="text-primary-main text-xl font-bold">
-                  {getInitials(user?.firstName, user?.lastName)}
-                </span>
-              )}
-            </div>
-            <div className="flex-1">
-              <h1 className="text-xl font-bold text-text-primary">
-                Привет, {displayName}! 👋
-              </h1>
-              <p className="text-text-secondary text-sm">
-                Добро пожаловать в Outlivion
-              </p>
-            </div>
-          </div>
-        </Card>
+      {/* Header */}
+      <header className="absolute top-[-2px] left-[2px] w-fit p-6 z-20">
+      </header>
 
-        {/* Balance Card */}
-        <Card className="p-6">
-          <p className="text-sm text-text-secondary mb-1">Баланс</p>
-          <p className={`text-5xl font-bold mb-6 ${isLowBalance ? 'text-status-error' : 'text-text-primary'}`}>
-            {formatPrice(balance)}
-          </p>
-
-          {isLowBalance && (
-            <div className="mb-4 p-3 bg-status-error/10 border border-status-error/20 rounded-xl">
-              <p className="text-status-error text-sm">
-                ⚠️ Недостаточно средств. Пополните баланс для продолжения работы.
-              </p>
-            </div>
-          )}
-
-          <Button
-            onClick={handleTopUp}
-            className="w-full mb-3"
-            size="lg"
-          >
-            Пополнить баланс
-          </Button>
-
-          <Button
-            onClick={() => router.push('/telegram/billing')}
-            variant="ghost"
-            className="w-full"
-          >
-            История платежей
-          </Button>
-        </Card>
-
-        {/* Subscription Status */}
-        <Card className="p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-bold text-text-primary">Подписка</h3>
-              <p className="text-text-secondary text-sm">
-                {subscription?.status === 'active' ? 'Активна' : 'Неактивна'}
-              </p>
-            </div>
-            <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-              subscription?.status === 'active'
-                ? 'bg-status-success/20 text-status-success'
-                : 'bg-status-error/20 text-status-error'
-            }`}>
-              {subscription?.daysRemaining ? `${subscription.daysRemaining} дней` : 'Нет'}
+      {/* Main Content */}
+      <main className="relative z-10 flex flex-col items-center justify-between min-h-screen px-4 pb-8 pt-20">
+        
+        {/* Center Status Element */}
+        <div className="flex-1 flex flex-col items-center justify-center w-full max-w-[320px]">
+          {/* Glowing Circles Effect */}
+          <div className="relative w-[300px] h-[300px] flex items-center justify-center mb-8">
+            {/* Outer rings */}
+            <div className="absolute inset-0 border border-[#F55128]/5 rounded-full scale-150" />
+            <div className="absolute inset-0 border border-[#F55128]/10 rounded-full scale-125" />
+            <div className="absolute inset-0 border border-[#F55128]/20 rounded-full" />
+            
+            {/* Center Glow */}
+            <div className="absolute inset-0 bg-[#F55128] rounded-full blur-[60px] opacity-10 animate-pulse" />
+            
+            {/* Logo/Icon Container */}
+            <div className="relative z-10 flex flex-col items-center">
+               <div className="w-24 h-24 mb-4 flex items-center justify-center">
+                  <svg width="104" height="92" viewBox="0 0 104 92" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M52 0L103.962 30V92H0.0384521V30L52 0Z" fill="url(#paint0_linear)" fillOpacity="0.2"/>
+                    <path d="M52 2L101 31V90H3V31L52 2Z" stroke="#F55128" strokeWidth="2"/>
+                    <defs>
+                      <linearGradient id="paint0_linear" x1="52" y1="0" x2="52" y2="92" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#F55128"/>
+                        <stop offset="1" stopColor="#F55128" stopOpacity="0"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  {/* Text Logo Overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center pt-2">
+                    <span className="text-2xl font-bold tracking-wider text-white">O</span>
+                  </div>
+               </div>
             </div>
           </div>
 
-          <Button
-            onClick={handleViewSubscription}
-            variant="secondary"
-            className="w-full"
-          >
-            Подробнее
-          </Button>
-        </Card>
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            onClick={() => router.push('/telegram/servers')}
-            variant="secondary"
-            className="h-24 flex-col gap-2"
-          >
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
-            </svg>
-            <span className="text-sm font-medium">Серверы</span>
-          </Button>
-
-          <Button
-            onClick={() => router.push('/telegram/promo')}
-            variant="secondary"
-            className="h-24 flex-col gap-2"
-          >
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-            </svg>
-            <span className="text-sm font-medium">Промокод</span>
-          </Button>
         </div>
 
-        {/* Referral Program */}
-        <Card className="p-5">
-          <h3 className="text-xl font-bold text-text-primary mb-2">
-            Пригласи друга — получи 50₽ 🎁
-          </h3>
-          <p className="text-text-secondary text-sm mb-4">
-            Отправьте ссылку другу. Когда друг зарегистрируется, вы получите 50₽ на баланс!
-          </p>
+        {/* Bottom Actions Card (Glassmorphism) */}
+        <div className="w-full max-w-md bg-[#0D0D0D]/60 backdrop-blur-xl border border-[#F55128]/20 rounded-[32px] p-4 space-y-2.5 shadow-2xl shadow-black/50 flex flex-col gap-2">
+           {/* Status Text and Title Container */}
+           <div className="flex flex-row text-center gap-0 justify-between items-end z-10 w-full self-center">
+             <p className="text-white/40 text-sm font-medium w-fit">
+               {subDateText}
+             </p>
+             <p className="text-[#F55128] text-lg font-medium tracking-wide">
+               {subStatusText}
+             </p>
+             <h1 className="text-xl font-bold tracking-tight text-white drop-shadow-lg w-fit self-center">OutlivionVPN</h1>
+           </div>
+           
+           {/* Buy Subscription Button */}
+           <button
+             onClick={() => handleNavigation('/telegram/billing')}
+             className="group w-full flex items-center justify-between p-4 bg-[#F55128] active:bg-[#D93F1A] rounded-[24px] transition-all duration-200 active:scale-[0.98] h-[51px] mt-0"
+           >
+              <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                    <Settings className="w-4 h-4 text-white" />
+                 </div>
+                 <span className="font-medium text-white text-[16px]">Купить подписку</span>
+              </div>
+              <span className="text-sm font-medium text-white/90">от 150 ₽</span>
+           </button>
 
-          <div className="flex items-center gap-2">
-            <div className="flex-1 bg-background-tertiary rounded-xl px-3 py-2.5 min-w-0">
-              <p className="text-text-secondary text-xs truncate font-mono">
-                https://t.me/outlivionbot?start={user?.telegramId}
-              </p>
-            </div>
-            <Button
-              onClick={handleCopyReferralLink}
-              size="icon"
-              className="flex-shrink-0"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-            </Button>
-          </div>
-        </Card>
+           {/* Setup Button */}
+           <button
+              onClick={() => handleNavigation('/telegram/servers')}
+              className="group w-full flex items-center justify-between p-4 bg-gradient-to-r from-[#92351D] to-[#C93D1A] border border-[#F55128]/30 active:border-[#F55128]/50 rounded-[24px] transition-all duration-200 active:scale-[0.98] h-[51px] mt-0"
+              style={{ marginTop: '0px' }}
+           >
+              <div className="flex items-center gap-3">
+                 <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center overflow-hidden relative">
+                    <div className="absolute inset-0 bg-white/10 rotate-45 transform scale-150" />
+                    <Settings className="w-4 h-4 text-white relative z-10" />
+                 </div>
+                 <span className="font-medium text-white text-[16px]">Установка и настройка</span>
+              </div>
+              <span className="text-sm font-medium text-white/80">
+                 {devicePlatform}
+              </span>
+           </button>
 
-        {/* Info Card */}
-        <Card className="p-5">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary-main/20 flex items-center justify-center flex-shrink-0">
-              <svg className="w-5 h-5 text-primary-main" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <h4 className="font-semibold text-text-primary mb-1">
-                Тариф 100₽/мес
-              </h4>
-              <p className="text-text-secondary text-sm">
-                Безлимитный трафик, высокая скорость, до 3 устройств одновременно
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
+           {/* Grid for Profile & Support */}
+           <div className="flex gap-2 !mt-0">
+              <button 
+                onClick={() => handleNavigation('/telegram/profile')} // Assuming profile route exists or adding logic later
+                className="flex-1 flex items-center gap-3 p-4 bg-gradient-to-r from-[#92351D] to-[#C93D1A] border border-[#F55128]/30 active:border-[#F55128]/50 rounded-[24px] transition-all duration-200 active:scale-[0.98] h-[51px]"
+              >
+                 <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center">
+                    <UserIcon className="w-4 h-4 text-white" />
+                 </div>
+                 <span className="font-medium text-white text-[16px]">Профиль</span>
+              </button>
+              
+              <button 
+                 onClick={() => handleNavigation('/telegram/faq')} // Or link to support bot
+                 className="flex-1 flex items-center gap-3 p-4 bg-gradient-to-r from-[#92351D] to-[#C93D1A] border border-[#F55128]/30 active:border-[#F55128]/50 rounded-[24px] transition-all duration-200 active:scale-[0.98] h-[51px]"
+              >
+                 <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center">
+                    <HelpCircle className="w-4 h-4 text-white" />
+                 </div>
+                 <span className="font-medium text-white text-[16px]">Поддержка</span>
+              </button>
+           </div>
+
+        </div>
+      </main>
     </div>
   );
 }
-

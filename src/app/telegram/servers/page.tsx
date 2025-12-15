@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
-import { NavigationBar } from '@/components/navigation-bar';
 import { useToast } from '@/components/ui/toast';
 import { serverApi, Server } from '@/lib/api';
 import { hapticImpact, hapticSelection, showBackButton, hideBackButton } from '@/lib/telegram';
@@ -223,7 +222,6 @@ export default function ServersPage() {
         )}
       </div>
 
-      <NavigationBar />
     </div>
   );
 }

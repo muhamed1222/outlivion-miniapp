@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loading } from '@/components/ui/loading';
-import { NavigationBar } from '@/components/navigation-bar';
 import { useToast } from '@/components/ui/toast';
 import { userApi, Subscription, User } from '@/lib/api';
 import { hapticImpact, showBackButton, hideBackButton } from '@/lib/telegram';
@@ -278,8 +277,6 @@ export default function SubscriptionPage() {
           </Card>
         )}
       </div>
-
-      <NavigationBar />
     </div>
   );
 }
