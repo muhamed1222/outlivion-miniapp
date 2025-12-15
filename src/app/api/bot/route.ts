@@ -158,6 +158,63 @@ export async function POST(request: NextRequest) {
 }
 
 /**
+ * Check pending login session and show confirmation button if exists
+ * Returns true if pending session was found and message was sent
+ */
+async function checkAndShowPendingSession(chatId: number, telegramId: string): Promise<boolean> {
+  try {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+    console.log('[BOT] Checking pending session for telegramId:', telegramId);
+    
+    const sessionCheck = await axios.get(
+      `${API_URL}/auth/bot/pending-session?telegramId=${telegramId}`,
+      { timeout: 5000 }
+    );
+    
+    if (sessionCheck.data.hasPendingSession) {
+      const token = sessionCheck.data.token;
+      console.log('[BOT] ✅ Found pending login session, showing confirmation:', { 
+        telegramId, 
+        token: token.substring(0, 16) + '...',
+        chatId 
+      });
+      
+      await sendMessage(chatId, '🔐 **Подтверждение входа в Outlivion Web Portal**\n\nВы пытаетесь войти через браузер.\n\nПодтвердите вход, нажав кнопку ниже:', {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: '✅ Подтвердить вход',
+                callback_data: `confirm_login_${token}`,
+              },
+            ],
+            [
+              {
+                text: '❌ Отменить',
+                callback_data: 'cancel_login',
+              },
+            ],
+          ],
+        },
+      });
+      return true; // Пending session found and message sent
+    } else {
+      console.log('[BOT] No pending session for telegramId:', telegramId);
+      return false;
+    }
+  } catch (error: any) {
+    console.warn('[BOT] Could not check pending session:', {
+      error: error.message,
+      telegramId,
+      chatId,
+      status: error.response?.status,
+    });
+    return false;
+  }
+}
+
+/**
  * Handle incoming messages
  */
 async function handleMessage(update: TelegramUpdate) {
@@ -165,7 +222,12 @@ async function handleMessage(update: TelegramUpdate) {
   const chatId = message.chat.id
   const text = message.text
 
-  if (!text) return
+  if (!text) {
+    // Даже если нет текста, проверяем pending session
+    const telegramId = String(message.from.id);
+    await checkAndShowPendingSession(chatId, telegramId);
+    return;
+  }
 
   // ПРИОРИТЕТ: Проверяем pending login session ПЕРЕД обработкой команд
   // (кроме случая когда это /start с токеном)
@@ -173,41 +235,10 @@ async function handleMessage(update: TelegramUpdate) {
   const isStartWithToken = text.startsWith('/start login_');
   
   if (!isStartWithToken) {
-    try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-      const sessionCheck = await axios.get(
-        `${API_URL}/auth/bot/pending-session?telegramId=${telegramId}`,
-        { timeout: 5000 }
-      );
-      
-      if (sessionCheck.data.hasPendingSession) {
-        const token = sessionCheck.data.token;
-        console.log('[BOT] Found pending login session, showing confirmation:', { telegramId, token, command: text });
-        
-        await sendMessage(chatId, '🔐 **Подтверждение входа в Outlivion Web Portal**\n\nВы пытаетесь войти через браузер.\n\nПодтвердите вход, нажав кнопку ниже:', {
-          parse_mode: 'Markdown',
-          reply_markup: {
-            inline_keyboard: [
-              [
-                {
-                  text: '✅ Подтвердить вход',
-                  callback_data: `confirm_login_${token}`,
-                },
-              ],
-              [
-                {
-                  text: '❌ Отменить',
-                  callback_data: 'cancel_login',
-                },
-              ],
-            ],
-          },
-        });
-        return; // Не обрабатываем дальше
-      }
-    } catch (error) {
-      console.warn('[BOT] Could not check pending session:', error);
-      // Продолжаем с обычной обработкой
+    // Проверяем pending session для любого сообщения
+    const hasPending = await checkAndShowPendingSession(chatId, telegramId);
+    if (hasPending) {
+      return; // Не обрабатываем дальше, уже показали кнопку подтверждения
     }
   }
 
@@ -228,6 +259,13 @@ async function handleMessage(update: TelegramUpdate) {
   } else if (text.startsWith('/status')) {
     await handleStatusCommand(chatId, message.from.id)
   } else {
+    // Проверяем pending session для любого сообщения (если еще не проверили)
+    // Это помогает когда пользователь пишет боту после перехода по deep-link
+    const hasPending = await checkAndShowPendingSession(chatId, telegramId);
+    if (hasPending) {
+      return; // Не отправляем обычное сообщение, уже показали кнопку подтверждения
+    }
+    
     // Обычный ответ на неизвестное сообщение
     await sendMessage(chatId, 'Используйте /help для списка команд');
   }
@@ -398,6 +436,14 @@ async function handleDeepLinkLogin(
  */
 async function handleStartCommand(chatId: number, from: any) {
   const firstName = from.first_name || 'Пользователь';
+  const telegramId = String(from.id);
+  
+  // СНАЧАЛА проверяем pending session - это приоритет!
+  const hasPending = await checkAndShowPendingSession(chatId, telegramId);
+  if (hasPending) {
+    console.log('[BOT] Pending session found, skipping welcome message');
+    return; // Не показываем обычное приветствие, уже показали кнопку подтверждения
+  }
   
   // Определяем URL для Mini App
   // Используем NEXT_PUBLIC_MINIAPP_URL или дефолтный production URL

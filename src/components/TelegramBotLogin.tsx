@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || 'outlivionbot';
 const POLL_INTERVAL = 2000; // Poll every 2 seconds
 const MAX_POLL_ATTEMPTS = 150; // 150 * 2s = 5 minutes
 const MAX_RETRIES = 3; // Maximum retry attempts for rate limiting
@@ -312,30 +313,68 @@ export default function TelegramBotLogin({ onSuccess, onError }: TelegramBotLogi
             <div className="w-12 h-12 border-4 border-[#F55128] border-t-transparent rounded-full animate-spin"></div>
             
             <div className="text-center">
-              <p className="text-white font-medium mb-2">
+              <p className="text-white font-medium mb-3">
                 Ожидаем подтверждение в Telegram
               </p>
-              <p className="text-neutral-400 text-sm mb-1">
-                Откройте бота в Telegram
-              </p>
-              <p className="text-neutral-500 text-xs mb-2">
-                Если кнопка <span className="font-semibold text-[#F55128]">Start</span> не показывается, просто напишите боту любое сообщение
-              </p>
-              <p className="text-neutral-500 text-xs mb-4">
-                Затем нажмите кнопку подтверждения в боте
-              </p>
-              <div className="flex items-center justify-center gap-2 text-neutral-500 text-xs">
+              
+              <div className="bg-neutral-900/50 border border-neutral-800 rounded-lg p-4 mb-4 text-left">
+                <p className="text-neutral-300 text-sm font-medium mb-3">
+                  📱 Инструкция:
+                </p>
+                <ol className="text-neutral-400 text-xs space-y-2.5 list-decimal list-inside">
+                  <li>
+                    <span className="font-semibold text-white">Откройте бота в Telegram</span>
+                    <br />
+                    <span className="text-neutral-500">(должен открыться автоматически в новой вкладке)</span>
+                  </li>
+                  <li>
+                    <span className="font-semibold text-[#F55128]">⚠️ Важно:</span>
+                    <br />
+                    Если кнопка <span className="font-mono bg-neutral-800 px-1.5 py-0.5 rounded text-[#F55128]">START</span> не показывается, 
+                    <br />
+                    <span className="font-semibold text-white">напишите боту любое сообщение:</span>
+                    <br />
+                    <span className="font-mono bg-neutral-800 px-2 py-1 rounded block mt-1 text-center">привет</span>
+                  </li>
+                  <li>
+                    <span className="font-semibold text-white">Бот автоматически покажет кнопку подтверждения</span>
+                    <br />
+                    <span className="text-neutral-500">(может занять 1-2 секунды)</span>
+                  </li>
+                  <li>
+                    Нажмите <span className="font-semibold text-green-400 bg-green-400/10 px-2 py-0.5 rounded">✅ Подтвердить вход</span>
+                  </li>
+                </ol>
+                
+                <div className="mt-4 pt-4 border-t border-neutral-800">
+                  <p className="text-neutral-500 text-xs">
+                    💡 <span className="font-semibold">Совет:</span> Если ничего не происходит, просто напишите боту любое слово
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-center gap-2 text-neutral-500 text-xs mb-4">
                 <div className="w-2 h-2 bg-[#F55128] rounded-full animate-pulse"></div>
                 <span>Проверка {pollCountRef.current}/{MAX_POLL_ATTEMPTS}</span>
               </div>
-            </div>
 
-            <button
-              onClick={handleCancel}
-              className="px-4 py-2 text-sm text-neutral-400 hover:text-white border border-neutral-700 hover:border-neutral-600 rounded-lg transition-colors"
-            >
-              Отменить
-            </button>
+              <div className="flex gap-2">
+                <a
+                  href={token ? `https://t.me/${BOT_USERNAME}?start=login_${token}` : `https://t.me/${BOT_USERNAME}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 text-sm text-[#F55128] hover:text-[#e04520] border border-[#F55128]/30 hover:border-[#F55128]/50 rounded-lg transition-colors"
+                >
+                  🔄 Открыть бота снова
+                </a>
+                <button
+                  onClick={handleCancel}
+                  className="px-4 py-2 text-sm text-neutral-400 hover:text-white border border-neutral-700 hover:border-neutral-600 rounded-lg transition-colors"
+                >
+                  Отменить
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
