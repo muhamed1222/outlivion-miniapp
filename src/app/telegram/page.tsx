@@ -81,7 +81,7 @@ export default function TelegramHomePage() {
   // Calculate subscription status text
   const isSubActive = subscription?.status === 'active';
   const subStatusText = isSubActive ? 'Активная подписка' : 'пробный период';
-  const subDateText = formatSubscriptionDate(subscription?.expiresAt);
+  const subDateText = formatSubscriptionDate(subscription?.endDate);
 
   // Device detection (simplified)
   const devicePlatform = 'macOS'; // In a real app, detect UA or user pref
